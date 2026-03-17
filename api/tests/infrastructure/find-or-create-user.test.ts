@@ -222,7 +222,7 @@ describe("findOrCreateUser", () => {
     // For a valid code (exists, not expired), the error path returns "exhausted"
     // because the expiry check passes but the $expr still fails.
 
-    it("returns inviteError=exhausted for a valid-but-unmatched invite code (buggy $expr)", async () => {
+    it("creates user in invite team with invite role", async () => {
       const db = getDb();
       const teamId = randomUUID();
       const inviteCode = "INV-TEST-123";
@@ -259,15 +259,16 @@ describe("findOrCreateUser", () => {
         { ...profile, providerId: "gh-invite-test" },
         inviteCode,
       );
-      // Due to the $expr bug, invite never matches; falls back to organic creation
       expect(result.isNew).toBe(true);
-      expect(result.inviteError).toBe("exhausted");
-      expect(result.joined).toBeUndefined();
-      // User gets their own personal team, not the invite team
-      expect(result.user.role).toBe("owner");
+      expect(result.user.teamId).toBe(teamId);
+      expect(result.user.role).toBe("member");
+      expect(result.joined).toBeTruthy();
+      expect(result.joined!.teamId).toBe(teamId);
+      expect(result.joined!.teamName).toBe("Invite Team");
+      expect(result.inviteError).toBeUndefined();
     });
 
-    it("does not modify invite code uses when $expr never matches", async () => {
+    it("increments invite code uses on successful join", async () => {
       const db = getDb();
       const teamId = randomUUID();
       const inviteCode = "INV-USE-COUNT";
@@ -307,8 +308,7 @@ describe("findOrCreateUser", () => {
 
       const team = await db.collection("teams").findOne({ _id: teamId });
       const invite = team!.inviteCodes.find((ic: any) => ic.code === inviteCode);
-      // Uses should remain 0 since $expr never matched
-      expect(invite.uses).toBe(0);
+      expect(invite.uses).toBe(1);
     });
 
     it("returns inviteError=not_found when code does not exist", async () => {
@@ -359,10 +359,10 @@ describe("findOrCreateUser", () => {
       expect(result.user.role).toBe("owner");
     });
 
-    it("creates a personal team as fallback when invite $expr fails", async () => {
+    it("joins invite team directly without creating personal team", async () => {
       const db = getDb();
       const teamId = randomUUID();
-      const inviteCode = "INV-FALLBACK-TEAM";
+      const inviteCode = "INV-DIRECT-JOIN";
 
       await db.collection("teams").insertOne({
         _id: teamId,
@@ -397,12 +397,11 @@ describe("findOrCreateUser", () => {
         inviteCode,
       );
 
-      // Due to $expr bug, user falls back to organic creation with a personal team
-      // So there will be 2 teams: the pre-existing invite team + the new personal team
+      // User joins the invite team directly — no personal team created
       const teamCount = await db.collection("teams").countDocuments();
-      expect(teamCount).toBe(2);
-      expect(result.user.role).toBe("owner");
-      expect(result.user.teamId).not.toBe(teamId);
+      expect(teamCount).toBe(1); // only the invite team
+      expect(result.user.role).toBe("member");
+      expect(result.user.teamId).toBe(teamId);
     });
   });
 

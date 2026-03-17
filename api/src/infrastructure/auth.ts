@@ -303,16 +303,11 @@ export async function findOrCreateUser(
   // Try invite code
   let inviteValid = false;
   if (inviteCode) {
+    // Atomically increment uses and add to usedBy, filtered by code + not expired
     const inviteResult = await db.collection("teams").findOneAndUpdate(
       {
         "inviteCodes.code": inviteCode,
         "inviteCodes.expiresAt": { $gt: now },
-        $expr: {
-          $lt: [
-            { $arrayElemAt: [{ $filter: { input: "$inviteCodes", as: "ic", cond: { $eq: ["$$ic.code", inviteCode] } } }, 0] },
-            { $arrayElemAt: [{ $map: { input: { $filter: { input: "$inviteCodes", as: "ic", cond: { $eq: ["$$ic.code", inviteCode] } } }, as: "ic", in: "$$ic.maxUses" } }, 0] },
-          ],
-        },
       },
       {
         $inc: { "inviteCodes.$.uses": 1 },
@@ -323,20 +318,31 @@ export async function findOrCreateUser(
 
     if (inviteResult) {
       const inviteEntry = (inviteResult as any).inviteCodes?.find((ic: any) => ic.code === inviteCode);
-      if (inviteEntry) {
+      // Check uses <= maxUses after increment (if uses > maxUses, the code was exhausted)
+      if (inviteEntry && inviteEntry.uses <= inviteEntry.maxUses) {
         teamId = (inviteResult as any)._id;
         role = inviteEntry.role;
         joined = { teamId, teamName: (inviteResult as any).name };
         inviteValid = true;
+      } else {
+        // Undo the increment — code was exhausted
+        await db.collection("teams").updateOne(
+          { "inviteCodes.code": inviteCode },
+          {
+            $inc: { "inviteCodes.$.uses": -1 },
+            $pull: { "inviteCodes.$.usedBy": newUserId } as any,
+          },
+        );
+        inviteError = "exhausted";
       }
     } else {
       // Determine reason
-      const code = await db.collection("teams").findOne({ "inviteCodes.code": inviteCode });
-      if (!code) {
+      const teamWithCode = await db.collection("teams").findOne({ "inviteCodes.code": inviteCode });
+      if (!teamWithCode) {
         inviteError = "not_found";
       } else {
-        const entry = (code as any).inviteCodes?.find((ic: any) => ic.code === inviteCode);
-        if (entry && entry.expiresAt < now) {
+        const entry = (teamWithCode as any).inviteCodes?.find((ic: any) => ic.code === inviteCode);
+        if (entry && new Date(entry.expiresAt) < now) {
           inviteError = "expired";
         } else {
           inviteError = "exhausted";
