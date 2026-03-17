@@ -7,7 +7,7 @@ describe("Redis infrastructure", () => {
   });
 
   it("connects and returns a Redis client", async () => {
-    const redis = await connectRedis("redis://localhost:6379");
+    const redis = await connectRedis("redis://localhost:6380");
     expect(redis).toBeDefined();
     expect(redis.status).toBe("ready");
   });

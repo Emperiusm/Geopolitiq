@@ -4,7 +4,7 @@ import { cacheAside } from "../../src/infrastructure/cache";
 
 describe("Cache-aside helper", () => {
   beforeAll(async () => {
-    await connectRedis("redis://localhost:6379");
+    await connectRedis("redis://localhost:6380");
   });
 
   afterAll(async () => {
@@ -43,6 +43,6 @@ describe("Cache-aside helper", () => {
     expect(result).toEqual({ fallback: true });
     expect(fetchCount).toBe(1);
 
-    await connectRedis("redis://localhost:6379");
+    await connectRedis("redis://localhost:6380");
   });
 });
