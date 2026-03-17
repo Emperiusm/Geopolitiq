@@ -4,14 +4,19 @@ import { resolve } from "path";
 const DATA_DIR = resolve(import.meta.dir, "../../../.firecrawl");
 
 /**
+ * Strip invalid escape sequences that are artifacts of the scrape extraction.
+ * The files contain \[ \] \` which are not valid JS escapes.
+ */
+function cleanEscapes(content: string): string {
+  return content.replace(/\\([\[\]`])/g, "$1");
+}
+
+/**
  * Read a .js file, clean extraction artifacts, and evaluate as JS.
- * The scraped files have `\[` and `\]` around array literals (invalid JS)
- * from the extraction process. We strip those before evaluating.
  */
 async function evalJsFile(filename: string, varName: string): Promise<unknown> {
   let raw = await readFile(resolve(DATA_DIR, filename), "utf-8");
-  // Remove extraction artifacts: \[ \] \` are not valid JS escape sequences
-  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]").replaceAll("\\`", "`");
+  raw = cleanEscapes(raw);
   const fn = new Function(`${raw}\nreturn ${varName};`);
   return fn();
 }
@@ -26,26 +31,27 @@ export async function parseBases(): Promise<any[]> {
   return evalJsFile("hegemon-bases.js", "BASES") as Promise<any[]>;
 }
 
-/** Parse hegemon-nsa-full.js -> [{ id, name, ideology, ... }] */
+/**
+ * Parse hegemon-nsa-full.js -> [{ id, name, ideology, ... }]
+ * This file has irregular format: `const NSA=ideology:"...",...` — bare object
+ * properties without array/object wrapping. Ends with `}]` so it needs `[{` prepended.
+ */
 export async function parseNSA(): Promise<any[]> {
   let raw = await readFile(resolve(DATA_DIR, "hegemon-nsa-full.js"), "utf-8");
-  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]").replaceAll("\\`", "`");
+  raw = cleanEscapes(raw);
 
-  // Try direct eval first (file may define `const NSA = [...]`)
-  try {
-    const fn = new Function(`${raw}\nreturn NSA;`);
-    const result = fn();
-    return Array.isArray(result) ? result : [result];
-  } catch {
-    // Fallback: file may start with `const NSA=` followed by bare properties
-    let content = raw.replace(/^const\s+NSA\s*=\s*/, "").replace(/;\s*$/, "");
-    if (!content.trimStart().startsWith("[")) {
-      content = `[{${content.trimStart().startsWith("{") ? content.trimStart().slice(1) : content}}]`;
-    }
-    const fn2 = new Function(`return (${content});`);
-    const result = fn2();
-    return Array.isArray(result) ? result : [result];
+  // Strip variable declaration
+  let content = raw.replace(/^const\s+NSA\s*=\s*/, "").replace(/;\s*$/, "");
+
+  // Content starts with bare properties like `ideology:"..."` and ends with `}]`
+  // It's missing the leading `[{`
+  if (!content.trimStart().startsWith("[")) {
+    content = "[{" + content;
   }
+
+  const fn = new Function(`return (${content});`);
+  const result = fn();
+  return Array.isArray(result) ? result : [result];
 }
 
 /** Parse hegemon-chokepoints.js -> [{ id, name, type, ... }] */
