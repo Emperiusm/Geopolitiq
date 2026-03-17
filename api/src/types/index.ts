@@ -275,6 +275,38 @@ export interface TemporalSnapshot {
   nsa: SnapshotNSA[];
 }
 
+// --- Graph Edges ---
+
+export type EntityType =
+  | "country" | "conflict" | "chokepoint"
+  | "nsa" | "base" | "trade-route" | "port" | "news";
+
+export type EdgeRelation =
+  | "involves"           // conflict → country
+  | "hosted-by"          // base → country (host nation)
+  | "operated-by"        // base → country (operating country)
+  | "depends-on"         // chokepoint → country
+  | "ally-of"            // nsa → country
+  | "rival-of"           // nsa → country
+  | "passes-through"     // trade-route → chokepoint
+  | "originates-at"      // trade-route → port
+  | "terminates-at"      // trade-route → port
+  | "port-in"            // port → country
+  | "participates-in"    // nsa → conflict (inferred)
+  | "disrupts"           // conflict → chokepoint (inferred)
+  | "mentions"           // news → country|conflict|chokepoint|nsa
+  ;
+
+export interface GraphEdge {
+  _id?: any;
+  from: { type: EntityType; id: string };
+  to: { type: EntityType; id: string };
+  relation: EdgeRelation;
+  weight: number;
+  source: "seed" | "nlp" | "inferred";
+  createdAt: Date;
+}
+
 // --- API Response Envelope ---
 
 export interface ApiMeta {

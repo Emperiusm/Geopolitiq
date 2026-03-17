@@ -29,9 +29,11 @@ import { compareRouter } from "./modules/aggregate/compare";
 import { binaryLayersRouter } from "./modules/binary/layers";
 import { seedRoutes } from "./modules/system/seed-routes";
 import { timelineRouter } from "./modules/aggregate/timeline";
+import { graphRouter } from "./modules/aggregate/graph";
 import { startConflictCounter } from "./modules/periodic/conflict-counter";
 import { ensureSnapshotIndexes } from "./infrastructure/snapshots";
 import { buildEntityDictionary } from "./infrastructure/entity-dictionary";
+import { rebuildGraph } from "./infrastructure/graph";
 
 const app = new Hono();
 
@@ -64,6 +66,7 @@ api.route("/compare", compareRouter);
 api.route("/layers", binaryLayersRouter);
 api.route("/seed", seedRoutes);
 api.route("/timeline", timelineRouter);
+api.route("/graph", graphRouter);
 
 app.route("/api/v1", api);
 
@@ -98,6 +101,8 @@ async function start() {
   await ensureSnapshotIndexes();
   const dictSize = await buildEntityDictionary();
   console.log(`[gambit] Entity dictionary built (${dictSize} patterns)`);
+  const edgeCount = await rebuildGraph();
+  console.log(`[gambit] Graph built (${edgeCount} edges)`);
   startConflictCounter();
 }
 
