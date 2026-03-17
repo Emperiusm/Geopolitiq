@@ -67,6 +67,7 @@ interface TokenResponse {
 - User document has `roleVersion: number`, incremented on any role/team change.
 - `roleVersion` is included in the access JWT.
 - Middleware compares JWT's `roleVersion` against a Redis-cached value (`gambit:user:{userId}:rv`, 60s TTL, lazy-populated from MongoDB on miss).
+- **Active invalidation:** When a role/team change or account deletion occurs, the handler immediately issues `DEL gambit:user:{userId}:rv` to Redis. This eliminates the up-to-60-second stale window. The next request lazy-populates from MongoDB.
 - Redis down? Fail open, log warning, continue. The access token is only valid for 15 minutes anyway.
 - Mismatch? Return 401 `{ code: "ROLE_CHANGED", action: "refresh" }` — frontend triggers token refresh, gets new JWT with current role.
 
@@ -80,6 +81,10 @@ interface TokenResponse {
 ### "Which Provider Did I Use?" UX
 
 On the login page, show both OAuth buttons always. If a user tries Google but their email is linked to GitHub only, auto-linking handles it silently (verified email). No error, no confusion.
+
+### CSRF Protection
+
+The refresh token is delivered as an httpOnly cookie with `SameSite=Strict`. This is the CSRF defense for all cookie-bearing endpoints (`/auth/refresh`). No additional CSRF token is needed. **Important:** If `SameSite=Strict` is ever relaxed to `Lax` (e.g., for cross-site redirect flows), a CSRF token must be added to cookie-bearing endpoints.
 
 ### Graceful Re-Auth
 
@@ -289,7 +294,8 @@ interface AuditEvent {
   };
   metadata?: Record<string, any>;     // { oldRole: "member", newRole: "admin" }
   ip: string;
-  createdAt: Date;                    // TTL: 90 days free, 1 year pro
+  expiresAt: Date;                    // computed at insertion: now + 90d (free) or now + 365d (pro)
+  createdAt: Date;
 }
 
 type AuditAction =
@@ -312,7 +318,8 @@ type AuditAction =
   | "apikey.revoked"
   | "apikey.rotated"
   | "session.revoked"
-  | "settings.updated";
+  | "settings.updated"
+  | "provider.linked";
 ```
 
 ### Recovery Token
@@ -352,8 +359,10 @@ sessions:                 index on userId
 authCodes:                TTL on expiresAt
 apiKeys:                  unique on keyHash
                           index on userId
+                          index on teamId
 auditEvents:              compound index on teamId + createdAt
-                          TTL on createdAt (plan-dependent: 90d free, 365d pro)
+                          TTL on expiresAt (computed at write time: 90d free, 365d pro)
+                          Note: plan upgrades don't retroactively extend existing events
 savedViews:               index on teamId
 recoveryTokens:           TTL on expiresAt
                           index on userId
@@ -491,6 +500,8 @@ Retry-After: 23                 // only on 429
 
 Role-based limits: owner 1000/min, admin 500/min, member 200/min, viewer 50/min.
 
+**API key rate limits:** API key requests inherit the user's role-based limit. For machine-to-machine integrations that need higher throughput, the user's role determines the ceiling. Pro teams may have elevated limits in the future (configurable per-plan), but at launch, API keys share the same pool as browser requests for the same userId.
+
 ### Route Protection Map
 
 | Routes | Auth | Role | Platform | Scope | Notes |
@@ -502,6 +513,7 @@ Role-based limits: owner 1000/min, admin 500/min, member 200/min, viewer 50/min.
 | `/team` (read) | Required | Any | — | read ok | |
 | `/team` (mutate), `/team/invite` | Required | admin+ | — | read-write | Audit logged |
 | `/team` (delete), ownership transfer | Required | owner | — | read-write | Audit logged |
+| `/team/leave` | Required | Any (not owner) | — | read-write | Audit logged |
 | `/team/watchlist` (read) | Required | Any | — | read ok | |
 | `/team/watchlist` (mutate) | Required | member+ | — | read-write | |
 | `/team/views` (read) | Required | Any | — | read ok | |
@@ -573,10 +585,11 @@ Role-based limits: owner 1000/min, admin 500/min, member 200/min, viewer 50/min.
 | `GET` | `/team` | Required | Any | Team info + member list. `?search=&limit=50&offset=0`. |
 | `PUT` | `/team` | Required | admin+ | Update team name/slug. Audit logged. |
 | `DELETE` | `/team` | Required | owner | Delete team. All other members must be removed first. Audit logged. |
-| `POST` | `/team/invite` | Required | admin+ | Generate invite code. Body: `{ label?, role, expiresInDays?, maxUses? }`. Defaults: 7 days, 10 uses. Audit logged. |
+| `POST` | `/team/invite` | Required | admin+ | Generate invite code. Body: `{ label?, role, expiresInDays?, maxUses? }`. Defaults: 7 days, 10 uses. Max 50 active codes per team. Audit logged. |
 | `GET` | `/team/invites` | Required | admin+ | List active invite codes with usage stats. |
 | `DELETE` | `/team/invites/:code` | Required | admin+ | Revoke invite code. Audit logged. |
-| `POST` | `/team/join` | Required | Any | Join team with invite code. Body: `{ code }`. Leaves current personal team. Audit logged. |
+| `POST` | `/team/join` | Required | Any | Join team with invite code. Body: `{ code }`. Returns new access JWT directly (avoids full re-auth). Audit logged. |
+| `POST` | `/team/leave` | Required | Any | Leave current team. Cannot leave if owner (must transfer first). Creates fresh personal team. Revokes API keys (security: keys should not carry over to new context). Returns new access JWT. Audit logged. |
 | `GET` | `/team/invite-info/:code` | None | — | Public. Returns team name, inviter name, role being offered. 404/410 for invalid/expired. |
 | `DELETE` | `/team/members/:userId` | Required | admin+ | Remove member. Cannot remove owner. Audit logged. |
 | `PUT` | `/team/members/:userId/role` | Required | owner | Change role. Increments target's roleVersion. Audit logged. |
@@ -627,7 +640,7 @@ Role-based limits: owner 1000/min, admin 500/min, member 200/min, viewer 50/min.
 
 | Route | Before | After |
 |---|---|---|
-| `GET/PUT/DELETE /settings/ai` | `X-User-Id` header | `c.get("userId")` from auth context, requires member+ |
+| `GET/PUT/DELETE /settings/ai` | `X-User-Id` header | `c.get("userId")` from auth context, requires member+. **Bug fix:** `GET` currently masks the encrypted ciphertext, not the plaintext. Fix: either decrypt-then-mask, or store the key prefix separately at write time. |
 | `POST /news/analyze` | userId from header | `c.get("userId")` for trigger, BYOK key resolution (team then personal) |
 | `GET /news/analysis` | No scoping | `teamScope(c)` — analyses visible to whole team |
 | SSE `/events` | No auth, broadcasts all | Authenticated via query param token, team-filtered, periodic revalidation |
@@ -703,6 +716,10 @@ findOrCreateUser(profile, inviteCode?)
   │   │  Update lastLoginAt
   │   │  Update avatar ONLY if customAvatar === false
   │   │  Name: never overwrite (user controls via PUT /auth/me)
+  │   │  Audit: provider.linked { provider, providerId }
+  │   │  Send "provider_linked" notification email:
+  │   │    "A new sign-in method ({provider}) was linked to your account.
+  │   │     If this wasn't you, remove it in account settings."
   │   │  If inviteCode present: ignore (same as returning user)
   │   │  Return { user, isNew: false }
   │
@@ -791,9 +808,48 @@ User calls POST /team/join { code }
   │   role = invite's role
   │   Increment roleVersion
   │
-  ├─ Revoke all active sessions (force re-login to get new teamId in JWT)
+  ├─ Invalidate Redis roleVersion cache (DEL gambit:user:{userId}:rv)
   │
-  └─ Audit: member.joined { teamId, inviteCode, previousTeamId }
+  ├─ Revoke all other sessions (keep current)
+  │   Revoke all API keys (keys should not silently carry over to new team context)
+  │
+  ├─ Issue new access JWT with updated teamId + role (returned in response)
+  │   Rotate refresh token cookie
+  │
+  ├─ Audit: member.joined { teamId, inviteCode, previousTeamId }
+  │
+  └─ Return 200: { accessToken, teamId, teamName, role }
+      Frontend replaces stored access token, redirects to app
+```
+
+### Team Leave (`POST /team/leave`)
+
+```
+User calls POST /team/leave
+  │
+  ├─ User is team owner?
+  │   → Return 409: "Transfer ownership before leaving the team"
+  │
+  ├─ Remove user from team (decrement member count)
+  │
+  ├─ Create fresh personal team:
+  │   name: "{name}'s Team", slug: generated, plan: "free", ownerId: userId
+  │
+  ├─ Update user:
+  │   teamId = new personal team
+  │   role = "owner"
+  │   Increment roleVersion
+  │
+  ├─ Invalidate Redis roleVersion cache
+  │
+  ├─ Revoke all API keys (security: keys should not carry context from old team)
+  │   User preferences (watchlist, notifications) carry over (per-user, not per-team)
+  │
+  ├─ Issue new access JWT + rotate refresh cookie
+  │
+  ├─ Audit (on old team): member.removed { userId, reason: "left" }
+  │
+  └─ Return 200: { accessToken, teamId, teamName, role: "owner" }
 ```
 
 ### Name and Avatar Rules
@@ -821,6 +877,7 @@ type EmailTemplate =
   | "deletion_cancelled"    // confirmation only
   | "account_recovery"      // recovery URL, admin name, expiry
   | "team_invite"           // team name, inviter name, join URL
+  | "provider_linked"       // provider name, account settings URL
 ```
 
 Concrete adapter choice deferred — Resend, SendGrid, or AWS SES. Console logger adapter for development. Swapping providers is a single-file change.
@@ -929,8 +986,15 @@ User clicks recovery link → /recover?token={token}
   │   ├─ Add new OAuth provider to user's providers[]
   │   ├─ Mark recovery token as used (usedAt = now)
   │   ├─ Proceed with normal login (auth code → token exchange)
-  │   └─ Audit: user.recovery_completed { provider, adminWhoInitiated }
+  │   └─ Audit: user.recovery_completed { provider, newProviderEmail, adminWhoInitiated }
 ```
+
+**Recovery security note:** Recovery tokens are high-security credentials. Anyone who intercepts a recovery email can link their own OAuth identity to the target account. The recovery flow intentionally allows linking any OAuth provider (since the user lost access to their original providers). Mitigations:
+- Tokens are single-use and expire in 24 hours
+- Only platform admins can initiate recovery (no self-service)
+- One active token per user (24h cooldown)
+- The audit trail records the new provider's email — if it doesn't match the account email, this is logged as a warning in the audit event metadata: `{ emailMismatch: true, accountEmail, recoveryEmail }`
+- The user receives a `provider_linked` notification email to their account email when the new provider is added
 
 ---
 
@@ -953,7 +1017,7 @@ User clicks recovery link → /recover?token={token}
 | Collection | Notes |
 |---|---|
 | newsAnalysis | AI analyses benefit all team members |
-| pluginConfigs | Which plugins enabled, team-specific settings |
+| pluginConfigs | Which plugins enabled, team-specific settings (model deferred — will be defined when per-team plugin configuration is implemented) |
 | teamSettings | Team-level BYOK key for AI analyses |
 | savedViews | Shared map presets and monitoring views |
 | auditEvents | Team activity history |
@@ -1024,7 +1088,10 @@ Client connects to GET /events?token={accessToken}
   └─ Heartbeat every 30 seconds
 ```
 
-SSE token in query param is acceptable: token is short-lived (15 min), connection upgrades to persistent stream immediately, server logs must not log query params on this endpoint.
+**SSE auth security note:** The access token appears in the query parameter because the browser's `EventSource` API does not support custom headers. Mitigations:
+- Token is short-lived (15 min) and the connection upgrades to a persistent stream immediately
+- **Deployment requirement:** Reverse proxies (nginx, Cloudflare) MUST be configured to not log query parameters on the `/events` endpoint. Add this to the deployment checklist.
+- **Alternative considered:** Ticket-based SSE auth (client POSTs to get a single-use connection ticket, then connects with that ticket instead of the JWT). This eliminates the token-in-URL issue entirely but adds a round trip. If the query param approach proves problematic in production, switch to ticket-based auth.
 
 ### Watchlist Merging (Frontend)
 
