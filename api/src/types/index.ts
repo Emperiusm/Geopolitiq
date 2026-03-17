@@ -460,3 +460,6 @@ export interface ApiError {
     message: string;
   };
 }
+
+// --- Auth & Multi-User Types ---
+export * from "./auth";
