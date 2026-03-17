@@ -104,7 +104,7 @@ export async function seedCountries(): Promise<number> {
   await col.createIndex({ region: 1 });
   await col.createIndex({ location: "2dsphere" });
   await col.createIndex({ tags: 1 });
-  await col.createIndex({ iso2: 1 }, { unique: true, sparse: true });
+  await col.createIndex({ iso2: 1 }, { unique: true, partialFilterExpression: { iso2: { $gt: "" } } });
   await col.createIndex({ name: "text" });
 
   return result.upsertedCount + result.modifiedCount + result.matchedCount;
