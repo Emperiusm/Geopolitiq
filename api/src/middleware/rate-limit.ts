@@ -1,13 +1,27 @@
 import type { MiddlewareHandler } from "hono";
 import { getRedis, isRedisConnected } from "../infrastructure/redis";
+import type { UserRole } from "../types/auth";
+
+const ROLE_LIMITS: Record<string, number> = {
+  owner: 1000,
+  admin: 500,
+  member: 200,
+  viewer: 50,
+};
+const DEFAULT_RPM = 100;
 
 const memoryCounters = new Map<string, { count: number; resetAt: number }>();
 
 export const rateLimit: MiddlewareHandler = async (c, next) => {
-  const rpm = Number(process.env.RATE_LIMIT_RPM ?? 100);
-  const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  // Use userId if authenticated, fall back to IP
+  const userId = c.get("userId") as string | undefined;
+  const role = (c.get("role") as UserRole) || undefined;
+  const identifier = userId || c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rpm = role ? (ROLE_LIMITS[role] ?? DEFAULT_RPM) : DEFAULT_RPM;
+
   const minute = Math.floor(Date.now() / 60000);
-  const key = `gambit:ratelimit:${ip}:${minute}`;
+  const resetEpoch = (minute + 1) * 60;
+  const key = `gambit:ratelimit:${identifier}:${minute}`;
 
   let count = 0;
 
@@ -17,25 +31,27 @@ export const rateLimit: MiddlewareHandler = async (c, next) => {
       count = await redis.incr(key);
       if (count === 1) await redis.expire(key, 60);
     } catch {
-      count = incrementMemory(ip, minute);
+      count = incrementMemory(identifier, minute);
     }
   } else {
-    count = incrementMemory(ip, minute);
+    count = incrementMemory(identifier, minute);
   }
 
-  if (count > rpm) {
-    c.header("Retry-After", "60");
-    return c.json({ error: { code: "RATE_LIMITED", message: "Too many requests" } }, 429);
-  }
-
+  // Always set rate limit headers
   c.header("X-RateLimit-Limit", String(rpm));
   c.header("X-RateLimit-Remaining", String(Math.max(0, rpm - count)));
+  c.header("X-RateLimit-Reset", String(resetEpoch));
+
+  if (count > rpm) {
+    c.header("Retry-After", String(resetEpoch - Math.floor(Date.now() / 1000)));
+    return c.json({ error: { code: "RATE_LIMITED", message: "Too many requests", action: "none" } }, 429);
+  }
 
   return next();
 };
 
-function incrementMemory(ip: string, minute: number): number {
-  const key = `${ip}:${minute}`;
+function incrementMemory(id: string, minute: number): number {
+  const key = `${id}:${minute}`;
   const entry = memoryCounters.get(key);
   if (entry && entry.resetAt === minute) {
     entry.count++;
