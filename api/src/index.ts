@@ -51,7 +51,7 @@ import { teamRoutes } from "./modules/system/team-routes";
 import { teamSettingsRoutes } from "./modules/system/team-settings-routes";
 import { notificationRoutes } from "./modules/system/notification-routes";
 import { adminRoutes } from "./modules/system/admin-routes";
-// import { startAccountCleanup } from "./modules/periodic/account-cleanup"; // Task 21
+import { startAccountCleanup } from "./modules/periodic/account-cleanup";
 
 const app = new Hono();
 
@@ -187,7 +187,7 @@ async function start() {
   startConflictCounter();
   startAnomalyCleanup();
   startNewsAggregator();
-  // startAccountCleanup(); // Task 21
+  startAccountCleanup();
 }
 
 start();
