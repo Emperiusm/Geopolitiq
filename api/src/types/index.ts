@@ -307,6 +307,39 @@ export interface GraphEdge {
   createdAt: Date;
 }
 
+// --- User Settings + AI Analysis ---
+
+export type LLMProvider = "anthropic" | "openai";
+
+export interface UserSettings {
+  _id: string;
+  llmProvider: LLMProvider;
+  llmApiKey: string;
+  llmModel?: string;
+  aiAnalysisEnabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NewsAnalysis {
+  _id?: any;
+  articleIds: string[];
+  summary: string;
+  perspectives: Array<{
+    source: string;
+    label: string;
+    sentiment: "positive" | "negative" | "neutral";
+  }>;
+  relevanceScore: number;
+  escalationSignal: "escalating" | "de-escalating" | "stable";
+  relatedCountries: string[];
+  conflictId: string | null;
+  provider: LLMProvider;
+  model: string;
+  userId: string;
+  analyzedAt: Date;
+}
+
 // --- API Response Envelope ---
 
 export interface ApiMeta {
