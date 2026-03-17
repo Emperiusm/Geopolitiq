@@ -34,6 +34,8 @@ import { startConflictCounter } from "./modules/periodic/conflict-counter";
 import { ensureSnapshotIndexes } from "./infrastructure/snapshots";
 import { buildEntityDictionary } from "./infrastructure/entity-dictionary";
 import { rebuildGraph } from "./infrastructure/graph";
+import { startNewsAggregator } from "./modules/periodic/news-aggregator";
+import { settingsRoutes } from "./modules/system/settings-routes";
 
 const app = new Hono();
 
@@ -67,6 +69,7 @@ api.route("/layers", binaryLayersRouter);
 api.route("/seed", seedRoutes);
 api.route("/timeline", timelineRouter);
 api.route("/graph", graphRouter);
+api.route("/settings", settingsRoutes);
 
 app.route("/api/v1", api);
 
@@ -104,6 +107,7 @@ async function start() {
   const edgeCount = await rebuildGraph();
   console.log(`[gambit] Graph built (${edgeCount} edges)`);
   startConflictCounter();
+  startNewsAggregator();
 }
 
 start();
