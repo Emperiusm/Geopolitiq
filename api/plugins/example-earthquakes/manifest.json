@@ -1,0 +1,27 @@
+{
+  "id": "example-earthquakes",
+  "name": "USGS Earthquake Events",
+  "version": "1.0.0",
+  "type": "source",
+  "collection": "earthquakes",
+  "pollInterval": 3600000,
+  "binaryLayer": {
+    "stride": 4,
+    "fields": ["lng", "lat", "magnitude", "depth"]
+  },
+  "entityLinks": {
+    "locationField": "location"
+  },
+  "deckglLayer": {
+    "type": "ScatterplotLayer",
+    "radiusField": "magnitude",
+    "radiusScale": 5000,
+    "colorMap": { "minor": "#FFA500", "moderate": "#FF4500", "major": "#DC143C" }
+  },
+  "panel": {
+    "icon": "activity",
+    "group": "HUMANITARIAN",
+    "sortField": "magnitude",
+    "sortDirection": "desc"
+  }
+}

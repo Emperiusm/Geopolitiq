@@ -36,6 +36,8 @@ import { buildEntityDictionary } from "./infrastructure/entity-dictionary";
 import { rebuildGraph } from "./infrastructure/graph";
 import { startNewsAggregator } from "./modules/periodic/news-aggregator";
 import { settingsRoutes } from "./modules/system/settings-routes";
+import { mountPlugins } from "./infrastructure/plugin-registry";
+import { pluginRoutes } from "./modules/system/plugin-routes";
 
 const app = new Hono();
 
@@ -70,6 +72,7 @@ api.route("/seed", seedRoutes);
 api.route("/timeline", timelineRouter);
 api.route("/graph", graphRouter);
 api.route("/settings", settingsRoutes);
+api.route("/plugins", pluginRoutes);
 
 app.route("/api/v1", api);
 
@@ -106,6 +109,8 @@ async function start() {
   console.log(`[gambit] Entity dictionary built (${dictSize} patterns)`);
   const edgeCount = await rebuildGraph();
   console.log(`[gambit] Graph built (${edgeCount} edges)`);
+  const pluginCount = await mountPlugins();
+  if (pluginCount > 0) console.log(`[gambit] ${pluginCount} plugins mounted`);
   startConflictCounter();
   startNewsAggregator();
 }

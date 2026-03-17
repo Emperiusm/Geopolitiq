@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getDb } from "../../infrastructure/mongo";
 import { cacheBinaryAside } from "../../infrastructure/binary-cache";
 import { notFound } from "../../helpers/response";
+import { getPluginLayerConfig } from "../../infrastructure/plugin-registry";
 
 export const binaryLayersRouter = new Hono();
 
@@ -111,7 +112,51 @@ binaryLayersRouter.get("/:layer/binary", async (c) => {
   const layer = c.req.param("layer");
   const config = LAYER_CONFIGS[layer];
 
-  if (!config) return notFound(c, "Layer", layer);
+  // Check plugin layers as fallback
+  if (!config) {
+    const pluginConfig = getPluginLayerConfig(layer);
+    if (!pluginConfig) return notFound(c, "Layer", layer);
+
+    const buf = await cacheBinaryAside(
+      `gambit:binary:plugin:${layer}`,
+      async () => {
+        const docs = await getDb().collection(pluginConfig.collection)
+          .find(pluginConfig.query ?? {}).toArray();
+        const stride = pluginConfig.stride;
+        let records: number[][] = [];
+
+        if (pluginConfig.handler && "encodeBinary" in pluginConfig.handler && pluginConfig.handler.encodeBinary) {
+          records = docs.map((d) => pluginConfig.handler!.encodeBinary!(d)).filter((r) => r.length > 0);
+        } else {
+          // Default: encode first `stride` numeric fields
+          records = docs.map((d) => [d.lng ?? 0, d.lat ?? 0, ...(new Array(stride - 2).fill(0))]).filter(Boolean);
+        }
+
+        const headerSize = 8;
+        const bodySize = records.length * stride * 4;
+        const ab = new ArrayBuffer(headerSize + bodySize);
+        const header = new DataView(ab);
+        header.setUint32(0, records.length, true);
+        header.setUint32(4, stride, true);
+        const body = new Float32Array(ab, headerSize);
+        for (let i = 0; i < records.length; i++) {
+          for (let j = 0; j < stride; j++) {
+            body[i * stride + j] = records[i][j] ?? 0;
+          }
+        }
+        return Buffer.from(ab);
+      },
+      3600,
+    );
+
+    return new Response(buf, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Length": String(buf.byteLength),
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  }
 
   const buf = await cacheBinaryAside(
     `gambit:binary:${layer}`,

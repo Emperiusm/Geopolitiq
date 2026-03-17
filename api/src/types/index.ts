@@ -340,6 +340,74 @@ export interface NewsAnalysis {
   analyzedAt: Date;
 }
 
+// --- Plugin System ---
+
+export interface PluginBinaryLayerConfig {
+  stride: number;
+  fields: string[];
+}
+
+export interface PluginDeckGLConfig {
+  type: string;
+  colorMap?: Record<string, string>;
+  colorRange?: number[][];
+  radiusField?: string;
+  radiusScale?: number;
+  weightField?: string;
+  radiusPixels?: number;
+}
+
+export interface PluginPanelConfig {
+  icon: string;
+  group: string;
+  sortField?: string;
+  sortDirection?: "asc" | "desc";
+}
+
+export interface PluginEntityLinks {
+  countryField?: string;
+  locationField?: string;
+}
+
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  type: "source" | "layer" | "enrichment";
+  // Source plugins
+  collection?: string;
+  pollInterval?: number;
+  binaryLayer?: PluginBinaryLayerConfig;
+  entityLinks?: PluginEntityLinks;
+  // Layer plugins
+  dataSource?: string;
+  query?: Record<string, any>;
+  // Enrichment plugins
+  appliesTo?: string;
+  requiresUserKey?: boolean;
+  fields?: string[];
+  // Shared
+  deckglLayer?: PluginDeckGLConfig;
+  panel?: PluginPanelConfig;
+}
+
+export interface PluginSourceHandler {
+  fetch(): Promise<any[]>;
+  encodeBinary?(doc: any): number[];
+}
+
+export interface PluginEnrichmentHandler {
+  enrich(doc: any, llmCall: (prompt: string) => Promise<string>): Promise<Record<string, any>>;
+}
+
+export interface RegisteredPlugin {
+  manifest: PluginManifest;
+  handler?: PluginSourceHandler | PluginEnrichmentHandler;
+  lastPolled?: Date;
+  docCount?: number;
+  status: "active" | "error" | "disabled";
+}
+
 // --- API Response Envelope ---
 
 export interface ApiMeta {
