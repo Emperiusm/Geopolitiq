@@ -1,0 +1,44 @@
+# docker-compose.yml
+services:
+  api:
+    build: ./api
+    ports: ["3000:3000"]
+    environment:
+      MONGO_URI: mongodb://mongo:27017/gambit
+      REDIS_URL: redis://redis:6379
+      API_KEY: ${API_KEY:-dev}
+      PORT: "3000"
+      NODE_ENV: development
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+    depends_on: [mongo, redis]
+    volumes:
+      - ./api/src:/app/src
+      - ./.firecrawl:/app/.firecrawl:ro
+
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  mongo-express:
+    image: mongo-express:latest
+    ports: ["8081:8081"]
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017
+    profiles: ["dev"]
+
+  frontend:
+    build: ./frontend
+    ports: ["5173:5173"]
+    environment:
+      VITE_API_URL: http://localhost:3000/api/v1
+    depends_on: [api]
+    profiles: ["dev"]
+
+volumes:
+  mongo-data:
