@@ -23,8 +23,10 @@ export const cacheHeaders: MiddlewareHandler = async (c, next) => {
 
   const path = new URL(c.req.url).pathname;
   let maxAge = 0;
+  let longestMatch = 0;
   for (const [prefix, ttl] of Object.entries(CACHE_TTLS)) {
-    if (path.startsWith(prefix) && prefix.length > maxAge) {
+    if (path.startsWith(prefix) && prefix.length > longestMatch) {
+      longestMatch = prefix.length;
       maxAge = ttl;
     }
   }

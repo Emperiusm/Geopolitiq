@@ -10,16 +10,15 @@ export const countriesRouter = new Hono();
 const CACHE_TTL = 3600; // 1 hour
 
 countriesRouter.get("/risks", async (c) => {
-  const result = await cacheAside("gambit:countries:risks", async () => {
+  const data = await cacheAside("gambit:countries:risks", async () => {
     const col = getDb().collection("countries");
-    const risks = await col.aggregate([
+    return col.aggregate([
       { $group: { _id: "$risk", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]).toArray();
-    return { risks };
   }, CACHE_TTL);
 
-  return success(c, result.risks, { cached: !!result._cached });
+  return success(c, data, { cached: !!data._cached });
 });
 
 countriesRouter.get("/:id", async (c) => {

@@ -10,7 +10,12 @@ export async function cacheAside<T>(
       const redis = getRedis();
       const cached = await redis.get(key);
       if (cached !== null) {
-        return { ...JSON.parse(cached), _cached: true };
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          Object.defineProperty(parsed, "_cached", { value: true, enumerable: false });
+          return parsed;
+        }
+        return { ...parsed, _cached: true };
       }
     } catch {
       // Redis error — fall through to fetcher

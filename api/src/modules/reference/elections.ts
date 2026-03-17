@@ -9,14 +9,13 @@ export const electionsRouter = new Hono();
 const CACHE_TTL = 3600;
 
 electionsRouter.get("/upcoming", async (c) => {
-  const result = await cacheAside("gambit:elections:upcoming", async () => {
-    const elections = await getDb().collection("elections")
+  const data = await cacheAside("gambit:elections:upcoming", async () => {
+    return getDb().collection("elections")
       .find({ dateISO: { $gte: new Date() } })
       .sort({ dateISO: 1 })
       .toArray();
-    return { elections };
   }, CACHE_TTL);
-  return success(c, result.elections);
+  return success(c, data);
 });
 
 electionsRouter.get("/:id", async (c) => {
