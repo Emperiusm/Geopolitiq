@@ -792,7 +792,7 @@ User calls POST /team/join { code }
   │   → Return 409: "Transfer team ownership before joining another team"
   │
   ├─ Migrate user-scoped data:
-  │   API keys: update teamId to new team
+  │   API keys: revoked (keys should not carry over to new team context)
   │   UserPreferences: no change (keyed by userId, team-independent)
   │   NotificationPreferences: no change (keyed by userId)
   │   UserSettings (BYOK keys): no change (keyed by userId)
