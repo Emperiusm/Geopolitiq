@@ -3,20 +3,17 @@ import {
   getUserSettings,
   setUserLLMKey,
   removeUserLLMKey,
+  getDecryptedLLMKey,
   maskApiKey,
 } from "../../infrastructure/user-settings";
 import { success, apiError, validationError } from "../../helpers/response";
+import { requireRole } from "../../middleware/require-role";
 import type { LLMProvider } from "../../types";
 
 export const settingsRoutes = new Hono();
 
-// For now, use a simple userId from header (X-User-Id). In production this would come from auth.
-function getUserId(c: any): string {
-  return c.req.header("x-user-id") || "default";
-}
-
-settingsRoutes.put("/ai", async (c) => {
-  const userId = getUserId(c);
+settingsRoutes.put("/ai", requireRole("member"), async (c) => {
+  const userId = c.get("userId") as string;
   const body = await c.req.json();
   const { provider, apiKey, model } = body;
 
@@ -27,7 +24,6 @@ settingsRoutes.put("/ai", async (c) => {
     return validationError(c, "apiKey is required (minimum 10 characters)");
   }
 
-  // Validate key with a minimal API call
   const valid = await validateLLMKey(provider as LLMProvider, apiKey);
   if (!valid.ok) {
     return apiError(c, "INVALID_KEY", valid.error || "API key validation failed", 400);
@@ -38,21 +34,26 @@ settingsRoutes.put("/ai", async (c) => {
 });
 
 settingsRoutes.get("/ai", async (c) => {
-  const userId = getUserId(c);
+  const userId = c.get("userId") as string;
   const settings = await getUserSettings(userId);
   if (!settings) {
     return success(c, { aiAnalysisEnabled: false });
   }
+
+  // Bug fix: decrypt first, then mask the plaintext (not the ciphertext)
+  const decrypted = await getDecryptedLLMKey(userId);
+  const maskedKey = decrypted ? maskApiKey(decrypted.apiKey) : null;
+
   return success(c, {
     provider: settings.llmProvider,
     model: settings.llmModel || null,
-    apiKey: maskApiKey(settings.llmApiKey), // show encrypted string masked, not decrypted
+    apiKey: maskedKey,
     aiAnalysisEnabled: settings.aiAnalysisEnabled,
   });
 });
 
-settingsRoutes.delete("/ai", async (c) => {
-  const userId = getUserId(c);
+settingsRoutes.delete("/ai", requireRole("member"), async (c) => {
+  const userId = c.get("userId") as string;
   await removeUserLLMKey(userId);
   return success(c, { aiAnalysisEnabled: false });
 });
@@ -76,18 +77,16 @@ async function validateLLMKey(
           messages: [{ role: "user", content: "test" }],
         }),
       });
-      // 200 or 400 (bad request but key valid) = key works. 401 = invalid key.
       if (res.status === 401) return { ok: false, error: "Invalid Anthropic API key" };
       return { ok: true };
     } else {
       const res = await fetch("https://api.openai.com/v1/models", {
-        headers: { "Authorization": `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (res.status === 401) return { ok: false, error: "Invalid OpenAI API key" };
       return { ok: true };
     }
-  } catch (err: any) {
-    // Network error — accept the key anyway (might be offline)
+  } catch {
     return { ok: true };
   }
 }
