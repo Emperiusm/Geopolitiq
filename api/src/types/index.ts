@@ -408,6 +408,37 @@ export interface RegisteredPlugin {
   status: "active" | "error" | "disabled";
 }
 
+// --- Source Provenance ---
+
+export type SourceTier = "primary" | "established" | "specialized" | "regional" | "aggregator" | "unknown";
+
+export interface CitationLink {
+  citedSource: string;
+  citedSourceDomain?: string;
+  citedSourceTier?: SourceTier;
+  citationType: "direct_quote" | "paraphrase" | "vague_attribution";
+  phrase: string;
+}
+
+export interface ArticleProvenance {
+  sourceTier: SourceTier;
+  citations: CitationLink[];
+  corroboration: {
+    totalSources: number;
+    independentSources: number;
+    primarySourceCount: number;
+    citationConvergence: boolean;
+  };
+  firstMover: {
+    isFirstMover: boolean;
+    firstMoverSource: string;
+    firstMoverTier: SourceTier;
+    timeToMainstream: number | null;
+  };
+  trustScore: number;
+  redFlags: string[];
+}
+
 // --- API Response Envelope ---
 
 export interface ApiMeta {

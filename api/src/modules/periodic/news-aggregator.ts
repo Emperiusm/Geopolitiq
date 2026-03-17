@@ -6,6 +6,7 @@ import { publishEvent } from "../../infrastructure/sse";
 import { captureSnapshot } from "../../infrastructure/snapshots";
 import { clusterArticles, analyzeForUser, getAIEnabledUsers } from "../../infrastructure/ai-analysis";
 import { recordAndDetect } from "../../infrastructure/anomaly-detector";
+import { buildStandaloneProvenance } from "../../infrastructure/provenance";
 import type { GraphEdge } from "../../types";
 
 const BATCH_CONCURRENCY = Number(process.env.NEWS_BATCH_CONCURRENCY ?? 15);
@@ -96,12 +97,21 @@ async function processArticle(article: ParsedArticle): Promise<boolean> {
   const tags = classifyTags(article.title, article.summary);
 
   const now = new Date();
+  // Source provenance (Tier 1 — standalone, updated with cluster context in Tier 2)
+  const provenance = buildStandaloneProvenance({
+    title: article.title,
+    summary: article.summary,
+    source: article.source,
+    publishedAt: article.publishedAt,
+  });
+
   const doc = {
     title: article.title,
     summary: article.summary,
     tags,
     sourceCount: 1,
     ...enriched,
+    provenance,
     publishedAt: article.publishedAt,
     _titleHash: hash,
     createdAt: now,
