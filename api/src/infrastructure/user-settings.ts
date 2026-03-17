@@ -9,7 +9,7 @@ function getEncryptionKey(): Buffer {
   return Buffer.from(hex, "hex");
 }
 
-function encrypt(plaintext: string): string {
+export function encrypt(plaintext: string): string {
   const key = getEncryptionKey();
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
@@ -19,7 +19,7 @@ function encrypt(plaintext: string): string {
   return `${iv.toString("base64")}:${authTag.toString("base64")}:${encrypted.toString("base64")}`;
 }
 
-function decrypt(ciphertext: string): string {
+export function decrypt(ciphertext: string): string {
   const key = getEncryptionKey();
   const [ivB64, tagB64, dataB64] = ciphertext.split(":");
   const iv = Buffer.from(ivB64, "base64");
