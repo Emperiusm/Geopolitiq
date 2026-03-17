@@ -234,6 +234,44 @@ export interface CountryColor {
   color: string;
 }
 
+// --- Temporal Snapshots ---
+
+export interface SnapshotConflict {
+  _id: string;
+  status: string;
+  dayCount: number;
+  casualties: ConflictCasualty[];
+}
+
+export interface SnapshotChokepoint {
+  _id: string;
+  status: ChokepointStatus;
+}
+
+export interface SnapshotCountry {
+  _id: string;
+  risk: RiskLevel;
+  leader: string;
+  tags: string[];
+}
+
+export interface SnapshotNSA {
+  _id: string;
+  status: string;
+  zones: NSAZone[];
+}
+
+export interface TemporalSnapshot {
+  _id?: any;
+  timestamp: Date;
+  trigger: "scheduled" | "event";
+  triggerDetail?: string;
+  conflicts: SnapshotConflict[];
+  chokepoints: SnapshotChokepoint[];
+  countries: SnapshotCountry[];
+  nsa: SnapshotNSA[];
+}
+
 // --- API Response Envelope ---
 
 export interface ApiMeta {

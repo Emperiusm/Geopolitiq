@@ -28,7 +28,9 @@ import { searchRouter } from "./modules/aggregate/search";
 import { compareRouter } from "./modules/aggregate/compare";
 import { binaryLayersRouter } from "./modules/binary/layers";
 import { seedRoutes } from "./modules/system/seed-routes";
+import { timelineRouter } from "./modules/aggregate/timeline";
 import { startConflictCounter } from "./modules/periodic/conflict-counter";
+import { ensureSnapshotIndexes } from "./infrastructure/snapshots";
 
 const app = new Hono();
 
@@ -60,6 +62,7 @@ api.route("/search", searchRouter);
 api.route("/compare", compareRouter);
 api.route("/layers", binaryLayersRouter);
 api.route("/seed", seedRoutes);
+api.route("/timeline", timelineRouter);
 
 app.route("/api/v1", api);
 
@@ -88,9 +91,10 @@ async function start() {
   }
 
   console.log(`[gambit] API listening on http://localhost:${port}`);
-  console.log("[gambit] Routes: /api/v1/{countries,bases,nsa,chokepoints,elections,trade-routes,ports,conflicts,news,events/stream,bootstrap,viewport,search,compare,layers,seed}");
+  console.log("[gambit] Routes: /api/v1/{countries,bases,nsa,chokepoints,elections,trade-routes,ports,conflicts,news,events/stream,bootstrap,viewport,search,compare,layers,seed,timeline}");
 
-  // Start periodic tasks
+  // Create indexes and start periodic tasks
+  await ensureSnapshotIndexes();
   startConflictCounter();
 }
 

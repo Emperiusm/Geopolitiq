@@ -1,5 +1,6 @@
 import { getDb } from "../../infrastructure/mongo";
 import { publishEvent } from "../../infrastructure/sse";
+import { captureSnapshot } from "../../infrastructure/snapshots";
 
 async function updateConflictDayCounts() {
   try {
@@ -18,6 +19,8 @@ async function updateConflictDayCounts() {
         });
       }
     }
+    // Capture temporal snapshot after conflict updates
+    await captureSnapshot("scheduled");
   } catch (err) {
     console.error("[periodic] Conflict day counter error:", err);
   }
