@@ -2144,3 +2144,1702 @@
 .deduction-result h3 { margin-top: 12px; margin-bottom: 4px; font-size: 1.1em; color: var(--text-bright, #fff); }
 .deduction-result ul { padding-left: 20px; margin-top: 4px; }
 .deduction-result li { margin-bottom: 4px; }
+
+/* ==========================================================
+   HegemonPanel — hegemonglobal.com design language
+   ========================================================== */
+
+/* ----------------------------------------------------------
+   Custom properties (scoped)
+   ---------------------------------------------------------- */
+.hegemon-panel {
+  --hegemon-cyan: #00d4ff;
+  --hegemon-red: var(--semantic-critical, #ff4444);
+  --hegemon-orange: var(--semantic-high, #ff8800);
+  --hegemon-green: #22c55e;
+  --hegemon-blue: #3b82f6;
+  --hegemon-purple: #a855f7;
+  --hegemon-teal: #14b8a6;
+  --hegemon-yellow: #eab308;
+  --hegemon-font: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+
+  font-family: var(--hegemon-font);
+  background: var(--bg, #0a0a0a);
+  color: var(--text, #e8e8e8);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ----------------------------------------------------------
+   Scrollable body beneath tabs
+   ---------------------------------------------------------- */
+.hegemon-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border, #2a2a2a) transparent;
+}
+.hegemon-body::-webkit-scrollbar { width: 6px; }
+.hegemon-body::-webkit-scrollbar-track { background: transparent; }
+.hegemon-body::-webkit-scrollbar-thumb {
+  background: var(--border, #2a2a2a);
+  border-radius: 3px;
+}
+.hegemon-body::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong, #444);
+}
+
+/* ----------------------------------------------------------
+   Section headers
+   ---------------------------------------------------------- */
+.hegemon-section-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--hegemon-cyan);
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+  font-family: var(--hegemon-font);
+}
+.hegemon-section-header:first-child { margin-top: 0; }
+
+.hegemon-section-header--red {
+  color: var(--hegemon-red);
+}
+
+/* ----------------------------------------------------------
+   Loading / empty states
+   ---------------------------------------------------------- */
+.hegemon-loading,
+.hegemon-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  color: var(--text-dim, #888);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+}
+
+.hegemon-error {
+  color: var(--hegemon-red);
+  padding: 12px;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ==========================================================
+   EVENTS TAB
+   ========================================================== */
+
+/* --- Top Stories Cards --- */
+.hegemon-top-stories {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hegemon-story-card {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-left: 3px solid var(--hegemon-cyan);
+  border-radius: 4px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.hegemon-story-card:hover {
+  border-color: var(--border-strong, #444);
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.08);
+}
+.hegemon-story-card--breaking {
+  border-left-color: var(--hegemon-red);
+}
+.hegemon-story-card--breaking:hover {
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.12);
+}
+
+.hegemon-story-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text, #e8e8e8);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.hegemon-story-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: var(--text-dim, #888);
+}
+
+.hegemon-story-time {
+  color: var(--text-muted, #666);
+  font-size: 10px;
+  margin-left: auto;
+}
+
+/* --- Category Badges --- */
+.hegemon-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  font-family: var(--hegemon-font);
+}
+.hegemon-badge--breaking {
+  background: var(--hegemon-red);
+  color: #fff;
+}
+.hegemon-badge--conflict {
+  background: var(--hegemon-orange);
+  color: #000;
+}
+.hegemon-badge--world {
+  background: var(--hegemon-blue);
+  color: #fff;
+}
+.hegemon-badge--security {
+  background: var(--hegemon-purple);
+  color: #fff;
+}
+.hegemon-badge--diplomacy {
+  background: var(--hegemon-teal);
+  color: #000;
+}
+.hegemon-badge--economic {
+  background: var(--hegemon-yellow);
+  color: #000;
+}
+.hegemon-badge--military {
+  background: #6b7280;
+  color: #fff;
+}
+
+/* --- Stat Pills --- */
+.hegemon-stat-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.hegemon-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--text-dim, #888);
+  font-family: var(--hegemon-font);
+}
+.hegemon-stat-pill .hegemon-stat-value {
+  color: var(--hegemon-cyan);
+  font-weight: 600;
+}
+.hegemon-stat-pill--critical .hegemon-stat-value {
+  color: var(--hegemon-red);
+}
+.hegemon-stat-pill--high .hegemon-stat-value {
+  color: var(--hegemon-orange);
+}
+
+/* --- Latest Updates --- */
+.hegemon-updates {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hegemon-update-card {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.hegemon-update-card:hover {
+  background: var(--surface-hover, #1e1e1e);
+}
+
+.hegemon-update-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.hegemon-update-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text, #e8e8e8);
+  line-height: 1.3;
+  flex: 1;
+}
+
+.hegemon-update-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-muted, #666);
+}
+
+.hegemon-sources-count {
+  font-size: 9px;
+  color: var(--text-dim, #888);
+  background: var(--bg, #0a0a0a);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+/* --- Load More --- */
+.hegemon-load-more {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 12px;
+  background: transparent;
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  color: var(--text-dim, #888);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  font-family: var(--hegemon-font);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.hegemon-load-more:hover {
+  border-color: var(--hegemon-cyan);
+  color: var(--hegemon-cyan);
+}
+
+/* ==========================================================
+   BRIEF TAB
+   ========================================================== */
+
+.hegemon-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --- Region Block --- */
+.hegemon-region {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.hegemon-region-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.hegemon-region-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hegemon-region-critical {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--hegemon-red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  font-family: var(--hegemon-font);
+}
+
+.hegemon-region-updates {
+  font-size: 10px;
+  color: var(--text-muted, #666);
+  margin-left: auto;
+}
+
+.hegemon-region-summary {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-secondary, #ccc);
+}
+.hegemon-region-summary p {
+  margin: 0 0 6px;
+}
+.hegemon-region-summary p:last-child { margin-bottom: 0; }
+
+/* --- Global Ramifications --- */
+.hegemon-ramifications {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.hegemon-ramifications-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--hegemon-cyan);
+  margin-bottom: 8px;
+}
+
+.hegemon-ramifications-text {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-secondary, #ccc);
+}
+
+/* --- Previous Briefings Accordion --- */
+.hegemon-prev-briefings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hegemon-accordion {
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hegemon-accordion-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface, #141414);
+  border: none;
+  color: var(--text-dim, #888);
+  font-size: 11px;
+  font-family: var(--hegemon-font);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.hegemon-accordion-trigger:hover {
+  background: var(--surface-hover, #1e1e1e);
+}
+
+.hegemon-accordion-chevron {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+.hegemon-accordion.open .hegemon-accordion-chevron {
+  transform: rotate(180deg);
+}
+
+.hegemon-accordion-body {
+  display: none;
+  padding: 10px;
+  border-top: 1px solid var(--border-subtle, #1a1a1a);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-secondary, #ccc);
+}
+.hegemon-accordion.open .hegemon-accordion-body {
+  display: block;
+}
+
+/* ==========================================================
+   ELECTIONS TAB
+   ========================================================== */
+
+.hegemon-elections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hegemon-election-section-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--hegemon-cyan);
+  margin-bottom: 4px;
+}
+
+.hegemon-election-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hegemon-election-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-left: 3px solid var(--hegemon-blue);
+  border-radius: 4px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.hegemon-election-card:hover {
+  border-color: var(--border-strong, #444);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.1);
+}
+.hegemon-election-card--recent {
+  border-left-color: var(--hegemon-green);
+}
+.hegemon-election-card--recent:hover {
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.1);
+}
+
+.hegemon-election-flag {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.hegemon-election-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hegemon-election-country {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  margin-bottom: 2px;
+}
+
+.hegemon-election-type {
+  font-size: 10px;
+  color: var(--text-dim, #888);
+}
+
+.hegemon-election-date {
+  font-size: 10px;
+  color: var(--text-muted, #666);
+  text-align: right;
+  flex-shrink: 0;
+  font-family: var(--hegemon-font);
+}
+
+/* Winner colors */
+.hegemon-winner {
+  font-size: 11px;
+  font-weight: 600;
+}
+.hegemon-winner--left   { color: var(--hegemon-green); }
+.hegemon-winner--right  { color: var(--hegemon-red); }
+.hegemon-winner--center { color: var(--hegemon-blue); }
+
+/* ==========================================================
+   ELECTION POPUP MODAL
+   ========================================================== */
+
+.hegemon-election-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hegemon-election-popup-flag {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.hegemon-election-popup-title {
+  flex: 1;
+}
+
+.hegemon-election-popup-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  margin-bottom: 4px;
+}
+
+.hegemon-election-popup-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hegemon-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-family: var(--hegemon-font);
+}
+.hegemon-risk-badge--critical {
+  background: var(--hegemon-red);
+  color: #fff;
+}
+.hegemon-risk-badge--high {
+  background: var(--hegemon-orange);
+  color: #000;
+}
+.hegemon-risk-badge--medium {
+  background: var(--hegemon-yellow);
+  color: #000;
+}
+.hegemon-risk-badge--low {
+  background: var(--hegemon-green);
+  color: #000;
+}
+
+.hegemon-status-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: var(--hegemon-font);
+}
+
+/* Info Grid */
+.hegemon-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hegemon-info-cell {
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border-subtle, #1a1a1a);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.hegemon-info-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted, #666);
+  margin-bottom: 4px;
+}
+
+.hegemon-info-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text, #e8e8e8);
+}
+
+/* Risk Chart Bar */
+.hegemon-risk-chart {
+  margin-bottom: 16px;
+}
+
+.hegemon-risk-chart-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted, #666);
+  margin-bottom: 6px;
+}
+
+.hegemon-risk-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border-subtle, #1a1a1a);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hegemon-risk-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.hegemon-risk-bar-fill--critical { background: var(--hegemon-red); }
+.hegemon-risk-bar-fill--high     { background: var(--hegemon-orange); }
+.hegemon-risk-bar-fill--medium   { background: var(--hegemon-yellow); }
+.hegemon-risk-bar-fill--low      { background: var(--hegemon-green); }
+
+/* Numbered Analysis Sections */
+.hegemon-analysis-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hegemon-analysis-section {
+  display: flex;
+  gap: 10px;
+}
+
+.hegemon-analysis-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--hegemon-cyan);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hegemon-cyan);
+  flex-shrink: 0;
+  font-family: var(--hegemon-font);
+}
+
+.hegemon-analysis-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.hegemon-analysis-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  margin-bottom: 4px;
+}
+
+.hegemon-analysis-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary, #ccc);
+}
+
+/* Article Links */
+.hegemon-article-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hegemon-article-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border-subtle, #1a1a1a);
+  border-radius: 4px;
+  text-decoration: none;
+  color: var(--text, #e8e8e8);
+  font-size: 11px;
+  transition: border-color 0.15s ease;
+}
+.hegemon-article-link:hover {
+  border-color: var(--border-strong, #444);
+}
+
+.hegemon-article-source {
+  display: inline-flex;
+  padding: 2px 6px;
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-dim, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.hegemon-article-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================
+   FORECAST TAB
+   ========================================================== */
+
+.hegemon-forecasts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hegemon-forecast-card {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.hegemon-forecast-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.hegemon-forecast-region {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  flex: 1;
+}
+
+/* Severity Badges */
+.hegemon-severity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  font-family: var(--hegemon-font);
+}
+.hegemon-severity-badge--catastrophic {
+  background: var(--hegemon-red);
+  color: #fff;
+}
+.hegemon-severity-badge--extreme {
+  background: var(--hegemon-orange);
+  color: #000;
+}
+.hegemon-severity-badge--severe {
+  background: var(--hegemon-yellow);
+  color: #000;
+}
+.hegemon-severity-badge--moderate {
+  background: var(--hegemon-blue);
+  color: #fff;
+}
+.hegemon-severity-badge--low {
+  background: var(--hegemon-green);
+  color: #000;
+}
+
+.hegemon-forecast-text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary, #ccc);
+  font-style: italic;
+  margin-bottom: 8px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border-subtle, #1a1a1a);
+}
+
+/* Trend Tags */
+.hegemon-trend-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hegemon-trend-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--hegemon-font);
+  color: var(--text-dim, #888);
+}
+.hegemon-trend-tag--up {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--hegemon-red);
+}
+.hegemon-trend-tag--down {
+  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--hegemon-green);
+}
+.hegemon-trend-tag--stable {
+  border-color: rgba(234, 179, 8, 0.3);
+  color: var(--hegemon-yellow);
+}
+
+.hegemon-trend-arrow {
+  font-size: 10px;
+}
+
+/* ==========================================================
+   HORIZON TAB
+   ========================================================== */
+
+.hegemon-horizon {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Category filter dots */
+.hegemon-horizon-filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+  margin-bottom: 4px;
+}
+
+.hegemon-horizon-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text-dim, #888);
+  font-family: var(--hegemon-font);
+  transition: color 0.15s ease;
+}
+.hegemon-horizon-filter:hover,
+.hegemon-horizon-filter.active {
+  color: var(--text, #e8e8e8);
+}
+
+.hegemon-horizon-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hegemon-horizon-dot--summit    { background: var(--hegemon-green); }
+.hegemon-horizon-dot--election  { background: var(--hegemon-blue); }
+.hegemon-horizon-dot--treaty    { background: var(--hegemon-purple); }
+.hegemon-horizon-dot--military  { background: var(--hegemon-red); }
+.hegemon-horizon-dot--economic  { background: var(--hegemon-yellow); }
+.hegemon-horizon-dot--sanctions { background: var(--hegemon-orange); }
+
+/* Month group */
+.hegemon-horizon-month {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim, #888);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+}
+
+/* Event entries (calendar style) */
+.hegemon-horizon-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hegemon-horizon-entry {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+}
+.hegemon-horizon-entry:last-child { border-bottom: none; }
+
+.hegemon-horizon-date-col {
+  width: 52px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.hegemon-horizon-month-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted, #666);
+}
+
+.hegemon-horizon-day {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  line-height: 1.1;
+}
+
+.hegemon-horizon-relative {
+  font-size: 9px;
+  color: var(--text-muted, #666);
+}
+
+.hegemon-horizon-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.hegemon-horizon-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text, #e8e8e8);
+  margin-bottom: 2px;
+}
+
+.hegemon-horizon-location {
+  font-size: 10px;
+  color: var(--text-dim, #888);
+  margin-bottom: 4px;
+}
+
+.hegemon-horizon-desc {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-muted, #666);
+}
+
+/* ==========================================================
+   STOCKS TAB
+   ========================================================== */
+
+.hegemon-stocks {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Primary indicator (e.g. Brent Crude) */
+.hegemon-primary-indicator {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.hegemon-primary-indicator:hover {
+  border-color: var(--border-strong, #444);
+}
+
+.hegemon-primary-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text, #e8e8e8);
+}
+
+.hegemon-primary-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  font-family: var(--hegemon-font);
+}
+
+.hegemon-primary-change {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--hegemon-font);
+}
+
+/* Market section */
+.hegemon-market-section {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hegemon-market-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+}
+
+.hegemon-market-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.hegemon-market-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+
+.hegemon-market-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hegemon-market-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.hegemon-market-status--open .hegemon-market-status-dot  { background: var(--hegemon-green); }
+.hegemon-market-status--open                             { color: var(--hegemon-green); }
+.hegemon-market-status--closed .hegemon-market-status-dot { background: var(--hegemon-red); }
+.hegemon-market-status--closed                           { color: var(--hegemon-red); }
+
+/* Index rows */
+.hegemon-index-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.hegemon-index-row:last-child { border-bottom: none; }
+.hegemon-index-row:hover { background: var(--surface-hover, #1e1e1e); }
+
+.hegemon-index-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text, #e8e8e8);
+}
+
+.hegemon-index-value {
+  width: 80px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text, #e8e8e8);
+  font-family: var(--hegemon-font);
+}
+
+.hegemon-index-change {
+  width: 70px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--hegemon-font);
+}
+
+/* Color helpers for change values */
+.hegemon-positive { color: var(--hegemon-green); }
+.hegemon-negative { color: var(--hegemon-red); }
+.hegemon-neutral  { color: var(--text-dim, #888); }
+
+/* ==========================================================
+   STOCK POPUP MODAL
+   ========================================================== */
+
+.hegemon-stock-popup-chart {
+  width: 100%;
+  height: 200px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border-subtle, #1a1a1a);
+  border-radius: 4px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.hegemon-stock-popup-chart svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hegemon-stock-chart-line {
+  fill: none;
+  stroke: var(--hegemon-red);
+  stroke-width: 1.5;
+}
+
+.hegemon-stock-chart-area {
+  fill: url(#hegemon-chart-gradient);
+  opacity: 0.15;
+}
+
+/* Time range buttons */
+.hegemon-time-range-btns {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.hegemon-time-range-btn {
+  padding: 4px 10px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 3px;
+  color: var(--text-dim, #888);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--hegemon-font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.hegemon-time-range-btn:hover {
+  border-color: var(--border-strong, #444);
+  color: var(--text, #e8e8e8);
+}
+.hegemon-time-range-btn.active {
+  background: var(--hegemon-cyan);
+  border-color: var(--hegemon-cyan);
+  color: #000;
+}
+
+/* Market overview table */
+.hegemon-market-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  font-family: var(--hegemon-font);
+}
+
+.hegemon-market-table th {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted, #666);
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border, #2a2a2a);
+}
+
+.hegemon-market-table td {
+  font-size: 11px;
+  color: var(--text, #e8e8e8);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+}
+.hegemon-market-table tr:last-child td { border-bottom: none; }
+
+/* Ticker search */
+.hegemon-ticker-search {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.hegemon-ticker-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  color: var(--text, #e8e8e8);
+  font-size: 11px;
+  font-family: var(--hegemon-font);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.hegemon-ticker-input::placeholder {
+  color: var(--text-muted, #666);
+}
+.hegemon-ticker-input:focus {
+  border-color: var(--hegemon-cyan);
+}
+
+.hegemon-ticker-go {
+  padding: 6px 14px;
+  background: var(--hegemon-cyan);
+  border: none;
+  border-radius: 4px;
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: var(--hegemon-font);
+  transition: opacity 0.15s ease;
+}
+.hegemon-ticker-go:hover { opacity: 0.85; }
+
+/* ==========================================================
+   TRAVEL TAB
+   ========================================================== */
+
+.hegemon-travel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Search & Date Filters */
+.hegemon-travel-filters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.hegemon-travel-search {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 10px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  color: var(--text, #e8e8e8);
+  font-size: 11px;
+  font-family: var(--hegemon-font);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.hegemon-travel-search::placeholder { color: var(--text-muted, #666); }
+.hegemon-travel-search:focus { border-color: var(--hegemon-cyan); }
+
+.hegemon-travel-date {
+  padding: 6px 8px;
+  background: var(--bg, #0a0a0a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  color: var(--text, #e8e8e8);
+  font-size: 11px;
+  font-family: var(--hegemon-font);
+  outline: none;
+  color-scheme: dark;
+}
+.hegemon-travel-date:focus { border-color: var(--hegemon-cyan); }
+
+/* Danger zone cards */
+.hegemon-danger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hegemon-danger-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-left: 3px solid var(--hegemon-red);
+  border-radius: 4px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+}
+.hegemon-danger-card:hover {
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.08);
+}
+
+.hegemon-danger-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.hegemon-danger-country {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  margin-bottom: 2px;
+}
+
+.hegemon-danger-reason {
+  font-size: 10px;
+  color: var(--text-dim, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Level Badges */
+.hegemon-lvl-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-family: var(--hegemon-font);
+  flex-shrink: 0;
+}
+.hegemon-lvl-badge--5 {
+  background: #7f1d1d;
+  color: #fca5a5;
+  border: 1px solid var(--hegemon-red);
+}
+.hegemon-lvl-badge--4 {
+  background: #7c2d12;
+  color: #fdba74;
+  border: 1px solid var(--hegemon-orange);
+}
+.hegemon-lvl-badge--3 {
+  background: #713f12;
+  color: #fde047;
+  border: 1px solid var(--hegemon-yellow);
+}
+.hegemon-lvl-badge--2 {
+  background: #1e3a5f;
+  color: #93c5fd;
+  border: 1px solid var(--hegemon-blue);
+}
+.hegemon-lvl-badge--1 {
+  background: #14532d;
+  color: #86efac;
+  border: 1px solid var(--hegemon-green);
+}
+
+/* ==========================================================
+   TRAVEL DETAIL VIEW
+   ========================================================== */
+
+.hegemon-travel-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Back button */
+.hegemon-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--hegemon-cyan);
+  font-size: 11px;
+  font-family: var(--hegemon-font);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.hegemon-back-btn:hover { opacity: 0.7; }
+
+/* Warning Banner */
+.hegemon-warning-banner {
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-align: center;
+  font-family: var(--hegemon-font);
+}
+.hegemon-warning-banner--critical {
+  background: var(--hegemon-red);
+  color: #fff;
+}
+.hegemon-warning-banner--high {
+  background: var(--hegemon-orange);
+  color: #000;
+}
+.hegemon-warning-banner--medium {
+  background: var(--hegemon-yellow);
+  color: #000;
+}
+
+/* Threat Assessment Box */
+.hegemon-threat-assessment {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.hegemon-threat-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--hegemon-cyan);
+  margin-bottom: 8px;
+}
+
+.hegemon-threat-text {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-secondary, #ccc);
+}
+
+.hegemon-threat-warning-box {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 68, 68, 0.05);
+  font-size: 11px;
+  color: var(--hegemon-red);
+  line-height: 1.4;
+}
+
+/* Other regions list */
+.hegemon-other-regions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hegemon-other-region-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--surface, #141414);
+  border: 1px solid var(--border-subtle, #1a1a1a);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text, #e8e8e8);
+}
+
+/* Local tips 2x2 grid */
+.hegemon-local-tips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.hegemon-tip-cell {
+  background: var(--surface, #141414);
+  border: 1px solid var(--border-subtle, #1a1a1a);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.hegemon-tip-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted, #666);
+  margin-bottom: 4px;
+}
+
+.hegemon-tip-value {
+  font-size: 11px;
+  color: var(--text, #e8e8e8);
+  line-height: 1.4;
+}
+
+/* Travel detail sections with colored headers */
+.hegemon-travel-section {
+  margin-bottom: 12px;
+}
+
+.hegemon-travel-section-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle, #1a1a1a);
+}
+.hegemon-travel-section-header--red    { color: var(--hegemon-red); }
+.hegemon-travel-section-header--cyan   { color: var(--hegemon-cyan); }
+.hegemon-travel-section-header--orange { color: var(--hegemon-orange); }
+
+/* ==========================================================
+   MODAL OVERLAY & SHARED MODAL
+   ========================================================== */
+
+.hegemon-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.hegemon-modal {
+  max-width: 720px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--surface, #141414);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+
+  /* Scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border, #2a2a2a) transparent;
+}
+.hegemon-modal::-webkit-scrollbar { width: 6px; }
+.hegemon-modal::-webkit-scrollbar-track { background: transparent; }
+.hegemon-modal::-webkit-scrollbar-thumb {
+  background: var(--border, #2a2a2a);
+  border-radius: 3px;
+}
+.hegemon-modal::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong, #444);
+}
+
+.hegemon-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border, #2a2a2a);
+  position: sticky;
+  top: 0;
+  background: var(--surface, #141414);
+  z-index: 1;
+}
+
+.hegemon-modal-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #e8e8e8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hegemon-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  color: var(--text-dim, #888);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.hegemon-modal-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hegemon-modal-body {
+  padding: 16px;
+}
+
+/* ==========================================================
+   SHARED UTILITIES
+   ========================================================== */
+
+/* Divider */
+.hegemon-divider {
+  border: none;
+  border-top: 1px solid var(--border-subtle, #1a1a1a);
+  margin: 12px 0;
+}
+
+/* Timestamp */
+.hegemon-timestamp {
+  font-size: 10px;
+  color: var(--text-muted, #666);
+  font-family: var(--hegemon-font);
+}
+
+/* Faded text */
+.hegemon-muted {
+  color: var(--text-muted, #666);
+}
+
+/* Monospace value display */
+.hegemon-mono {
+  font-family: var(--hegemon-font);
+}
+
+/* Flex helpers within hegemon */
+.hegemon-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hegemon-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Clickable row highlight */
+.hegemon-clickable {
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.hegemon-clickable:hover {
+  background: var(--surface-hover, #1e1e1e);
+}
+
+/* Text truncation */
+.hegemon-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Animate entry */
+@keyframes hegemon-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hegemon-animate-in {
+  animation: hegemon-fade-in 0.2s ease both;
+}
+
+@keyframes hegemon-modal-enter {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.hegemon-modal {
+  animation: hegemon-modal-enter 0.2s ease both;
+}
+
+@keyframes hegemon-overlay-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.hegemon-modal-overlay {
+  animation: hegemon-overlay-enter 0.15s ease both;
+}

@@ -41,6 +41,7 @@ import {
   EscalationCorrelationPanel,
   EconomicCorrelationPanel,
   DisasterCorrelationPanel,
+  HegemonPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
@@ -727,6 +728,10 @@ export class PanelLayoutManager implements AppModule {
 
     if (this.shouldCreatePanel('world-clock')) {
       this.ctx.panels['world-clock'] = new WorldClockPanel();
+    }
+
+    if (this.shouldCreatePanel('hegemon')) {
+      this.ctx.panels['hegemon'] = new HegemonPanel();
     }
 
     if (this.shouldCreatePanel('airline-intel')) {

@@ -1,0 +1,372 @@
+```json
+{
+  "status": "WARNING",
+  "summary": {
+    "total": 64,
+    "ok": 57,
+    "warn": 7,
+    "crit": 0
+  },
+  "checkedAt": "2026-03-17T03:34:51.322Z",
+  "checks": {
+    "earthquakes": {
+      "status": "OK",
+      "records": 12,
+      "seedAgeMin": 4,
+      "maxStaleMin": 30
+    },
+    "outages": {
+      "status": "OK",
+      "records": 3,
+      "seedAgeMin": 3,
+      "maxStaleMin": 30
+    },
+    "sectors": {
+      "status": "OK",
+      "records": 12,
+      "seedAgeMin": 2,
+      "maxStaleMin": 30
+    },
+    "etfFlows": {
+      "status": "OK",
+      "records": 4,
+      "seedAgeMin": 1,
+      "maxStaleMin": 60
+    },
+    "climateAnomalies": {
+      "status": "OK",
+      "records": 15,
+      "seedAgeMin": 92,
+      "maxStaleMin": 120
+    },
+    "wildfires": {
+      "status": "OK",
+      "records": 1,
+      "seedAgeMin": 30,
+      "maxStaleMin": 120
+    },
+    "marketQuotes": {
+      "status": "OK",
+      "records": 28,
+      "seedAgeMin": 2,
+      "maxStaleMin": 30
+    },
+    "commodityQuotes": {
+      "status": "OK",
+      "records": 6,
+      "seedAgeMin": 2,
+      "maxStaleMin": 30
+    },
+    "cyberThreats": {
+      "status": "OK",
+      "records": 998,
+      "seedAgeMin": 94,
+      "maxStaleMin": 480
+    },
+    "techReadiness": {
+      "status": "OK",
+      "records": 255,
+      "seedAgeMin": 32,
+      "maxStaleMin": 10080
+    },
+    "progressData": {
+      "status": "OK",
+      "records": 4,
+      "seedAgeMin": 32,
+      "maxStaleMin": 10080
+    },
+    "renewableEnergy": {
+      "status": "OK",
+      "records": 7,
+      "seedAgeMin": 32,
+      "maxStaleMin": 10080
+    },
+    "positiveGeoEvents": {
+      "status": "OK",
+      "records": 153,
+      "seedAgeMin": 1,
+      "maxStaleMin": 60
+    },
+    "riskScores": {
+      "status": "OK",
+      "records": 2
+    },
+    "naturalEvents": {
+      "status": "OK",
+      "records": 25,
+      "seedAgeMin": 3,
+      "maxStaleMin": 120
+    },
+    "flightDelays": {
+      "status": "OK",
+      "records": 111,
+      "seedAgeMin": 2,
+      "maxStaleMin": 60
+    },
+    "insights": {
+      "status": "OK",
+      "records": 9,
+      "seedAgeMin": 5,
+      "maxStaleMin": 30
+    },
+    "predictions": {
+      "status": "OK",
+      "records": 4,
+      "seedAgeMin": 4,
+      "maxStaleMin": 30
+    },
+    "cryptoQuotes": {
+      "status": "OK",
+      "records": 10,
+      "seedAgeMin": 1,
+      "maxStaleMin": 30
+    },
+    "gulfQuotes": {
+      "status": "OK",
+      "records": 14,
+      "seedAgeMin": 2,
+      "maxStaleMin": 30
+    },
+    "stablecoinMarkets": {
+      "status": "OK",
+      "records": 5,
+      "seedAgeMin": 1,
+      "maxStaleMin": 60
+    },
+    "unrestEvents": {
+      "status": "OK",
+      "records": 109,
+      "seedAgeMin": 4,
+      "maxStaleMin": 45
+    },
+    "iranEvents": {
+      "status": "OK",
+      "records": 48,
+      "seedAgeMin": 4195,
+      "maxStaleMin": 10080
+    },
+    "ucdpEvents": {
+      "status": "OK",
+      "records": 2000,
+      "seedAgeMin": 31,
+      "maxStaleMin": 420
+    },
+    "weatherAlerts": {
+      "status": "OK",
+      "records": 50,
+      "seedAgeMin": 2,
+      "maxStaleMin": 30
+    },
+    "spending": {
+      "status": "OK",
+      "records": 15,
+      "seedAgeMin": 32,
+      "maxStaleMin": 120
+    },
+    "techEvents": {
+      "status": "OK",
+      "records": 122,
+      "seedAgeMin": 32,
+      "maxStaleMin": 420
+    },
+    "gdeltIntel": {
+      "status": "OK",
+      "records": 6,
+      "seedAgeMin": 84,
+      "maxStaleMin": 120
+    },
+    "correlationCards": {
+      "status": "OK",
+      "records": 5,
+      "seedAgeMin": 4,
+      "maxStaleMin": 15
+    },
+    "forecasts": {
+      "status": "OK",
+      "records": 55,
+      "seedAgeMin": 2,
+      "maxStaleMin": 90
+    },
+    "securityAdvisories": {
+      "status": "OK",
+      "records": 224,
+      "seedAgeMin": 31,
+      "maxStaleMin": 90
+    },
+    "customsRevenue": {
+      "status": "OK",
+      "records": 38,
+      "seedAgeMin": 212,
+      "maxStaleMin": 1440
+    },
+    "serviceStatuses": {
+      "status": "OK",
+      "records": 30
+    },
+    "macroSignals": {
+      "status": "OK",
+      "records": 7,
+      "seedAgeMin": 4,
+      "maxStaleMin": 60
+    },
+    "bisPolicy": {
+      "status": "OK",
+      "records": 3,
+      "seedAgeMin": 2391,
+      "maxStaleMin": 2880
+    },
+    "bisExchange": {
+      "status": "EMPTY_ON_DEMAND",
+      "records": 0,
+      "seedAgeMin": 2417,
+      "maxStaleMin": 2880
+    },
+    "bisCredit": {
+      "status": "EMPTY_ON_DEMAND",
+      "records": 0,
+      "seedAgeMin": 2417,
+      "maxStaleMin": 2880
+    },
+    "shippingRates": {
+      "status": "EMPTY_ON_DEMAND",
+      "records": 0,
+      "seedAgeMin": 212,
+      "maxStaleMin": 420
+    },
+    "chokepoints": {
+      "status": "EMPTY_ON_DEMAND",
+      "records": 0,
+      "seedAgeMin": 5,
+      "maxStaleMin": 60
+    },
+    "minerals": {
+      "status": "OK",
+      "records": 5,
+      "seedAgeMin": 2416,
+      "maxStaleMin": 10080
+    },
+    "giving": {
+      "status": "OK",
+      "records": 1,
+      "seedAgeMin": 2403,
+      "maxStaleMin": 10080
+    },
+    "gpsjam": {
+      "status": "STALE_SEED",
+      "records": 644,
+      "seedAgeMin": 1292,
+      "maxStaleMin": 720
+    },
+    "theaterPosture": {
+      "status": "OK",
+      "records": 9,
+      "seedAgeMin": 1,
+      "maxStaleMin": 60
+    },
+    "theaterPostureLive": {
+      "status": "OK",
+      "records": 9
+    },
+    "theaterPostureBackup": {
+      "status": "OK",
+      "records": 9
+    },
+    "riskScoresLive": {
+      "status": "EMPTY_ON_DEMAND",
+      "records": 0
+    },
+    "usniFleet": {
+      "status": "OK",
+      "records": 10,
+      "seedAgeMin": 32,
+      "maxStaleMin": 420
+    },
+    "usniFleetStale": {
+      "status": "OK",
+      "records": 10
+    },
+    "faaDelays": {
+      "status": "OK",
+      "records": 5,
+      "seedAgeMin": 2,
+      "maxStaleMin": 60
+    },
+    "intlDelays": {
+      "status": "OK",
+      "records": 7,
+      "seedAgeMin": 1,
+      "maxStaleMin": 90
+    },
+    "notamClosures": {
+      "status": "OK",
+      "records": 0,
+      "seedAgeMin": 2,
+      "maxStaleMin": 90
+    },
+    "positiveEventsLive": {
+      "status": "OK",
+      "records": 153
+    },
+    "cableHealth": {
+      "status": "OK",
+      "records": 2
+    },
+    "cyberThreatsRpc": {
+      "status": "OK",
+      "records": 998
+    },
+    "militaryBases": {
+      "status": "OK",
+      "records": 1
+    },
+    "militaryFlights": {
+      "status": "OK",
+      "records": 18,
+      "seedAgeMin": 3,
+      "maxStaleMin": 15
+    },
+    "militaryFlightsStale": {
+      "status": "OK",
+      "records": 18
+    },
+    "temporalAnomalies": {
+      "status": "EMPTY_ON_DEMAND",
+      "records": 0
+    },
+    "displacement": {
+      "status": "OK",
+      "records": 1
+    },
+    "satellites": {
+      "status": "OK",
+      "records": 97,
+      "seedAgeMin": 32,
+      "maxStaleMin": 180
+    },
+    "portwatch": {
+      "status": "OK",
+      "records": 13,
+      "seedAgeMin": 32,
+      "maxStaleMin": 720
+    },
+    "corridorrisk": {
+      "status": "OK",
+      "records": 5,
+      "seedAgeMin": 32,
+      "maxStaleMin": 120
+    },
+    "chokepointTransits": {
+      "status": "OK",
+      "records": 2,
+      "seedAgeMin": 2,
+      "maxStaleMin": 15
+    },
+    "transitSummaries": {
+      "status": "OK",
+      "records": 2,
+      "seedAgeMin": 2,
+      "maxStaleMin": 15
+    }
+  }
+}
+```

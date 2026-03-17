@@ -1,0 +1,89 @@
+[      61ms] [ERROR] Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'sha256-LnMFPWZxTgVOr2VYwIh9mhQ3l/l3+a3SfNOLERnuHfY=' 'sha256-+SFBjfmi2XfnyAT3POBxf6JIKYDcNXtllPclOcaNBI0=' 'sha256-AhZAmdCW6h8iXMyBcvIrqN71FGNk4lwLD+lPxx43hxg=' 'sha256-PnEBZii+iFaNE2EyXaJhRq34g6bdjRJxpLfJALdXYt8=' 'sha256-cVhuR63Moy56DV5yG0caJCEyCugMTbYclkvkK6fSwXY=' 'sha256-4Z2xtr1B9QQugoojE/nbpOViG+8l2B7CZVlKgC78AeQ=' 'wasm-unsafe-eval' https://www.youtube.com https://static.cloudflareinsights.com https://vercel.live'. Either the 'unsafe-inline' keyword, a hash ('sha256-903UI9my1I7mqHoiVeZSc56yd50YoRJTB2269QqL76w='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked. @ http://localhost:5173/:260
+[     401ms] [ERROR] [feeds] DEFAULT_ENABLED name "Breaking Defense" not found in FULL_FEEDS! @ http://localhost:5173/src/config/feeds.ts:1347
+[     545ms] [WARNING] THREE.THREE.Clock: This module has been deprecated. Please use THREE.Timer instead. @ http://localhost:5173/node_modules/.vite/deps/chunk-JENIRZW7.js?v=b81f336e:296
+[     553ms] [ERROR] Loading the script 'https://va.vercel-scripts.com/v1/script.debug.js' violates the following Content Security Policy directive: "script-src 'self' 'sha256-LnMFPWZxTgVOr2VYwIh9mhQ3l/l3+a3SfNOLERnuHfY=' 'sha256-+SFBjfmi2XfnyAT3POBxf6JIKYDcNXtllPclOcaNBI0=' 'sha256-AhZAmdCW6h8iXMyBcvIrqN71FGNk4lwLD+lPxx43hxg=' 'sha256-PnEBZii+iFaNE2EyXaJhRq34g6bdjRJxpLfJALdXYt8=' 'sha256-cVhuR63Moy56DV5yG0caJCEyCugMTbYclkvkK6fSwXY=' 'sha256-4Z2xtr1B9QQugoojE/nbpOViG+8l2B7CZVlKgC78AeQ=' 'wasm-unsafe-eval' https://www.youtube.com https://static.cloudflareinsights.com https://vercel.live". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked. @ http://localhost:5173/node_modules/.vite/deps/@vercel_analytics.js?v=33b56e6e:185
+[     606ms] [ERROR] The script has an unsupported MIME type ('text/html'). @ :0
+[     608ms] [WARNING] [PWA] Service worker registration failed: SecurityError: Failed to register a ServiceWorker for scope ('http://localhost:5173/') with script ('http://localhost:5173/sw.js'): The script has an unsupported MIME type ('text/html'). @ http://localhost:5173/src/main.ts:368
+[    1368ms] [ERROR] Failed to load resource: the server responded with a status of 503 (Service Unavailable) @ http://localhost:5173/api/gpsjam:0
+[    1376ms] [ERROR] [App] Telegram intel fetch failed: SyntaxError: Unexpected token 'i', "import { g"... is not valid JSON @ http://localhost:5173/src/app/data-loader.ts:2394
+[    1377ms] [ERROR] [App] Telegram intel fetch failed: SyntaxError: Unexpected token 'i', "import { g"... is not valid JSON @ http://localhost:5173/src/app/data-loader.ts:2394
+[    1378ms] [ERROR] [Military Flight Tracking] Failed: SyntaxError: Unexpected token 'i', "import { g"... is not valid JSON @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    1381ms] [WARNING] [GDELT-Intel] RPC error: GDELT returned 429 @ http://localhost:5173/src/services/gdelt-intel.ts:128
+[    1384ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/api/forecast/v1/get-forecasts:0
+[    1393ms] [ERROR] [Polymarket] Failed: Error: No markets returned — upstream may be down @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2339ms] [WARNING] [News] Digest fetch failed, using fallback: TypeError: Failed to fetch
+    at DataLoaderManager.tryFetchDigest (http://localhost:5173/src/app/data-loader.ts:225:26)
+    at DataLoaderManager.loadNews (http://localhost:5173/src/app/data-loader.ts:801:32)
+    at http://localhost:5173/src/app/data-loader.ts:300:59
+    at runGuarded (http://localhost:5173/src/app/data-loader.ts:290:15)
+    at DataLoaderManager.loadAllData (http://localhost:5173/src/app/data-loader.ts:300:29)
+    at App.init (http://localhost:5173/src/App.ts:548:23) @ http://localhost:5173/src/app/data-loader.ts:237
+[    2339ms] [ERROR] [NWS Weather] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2339ms] [ERROR] [Iran Events] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2339ms] [WARNING] [TemporalBaseline] Check failed: TypeError: Failed to fetch
+    at InfrastructureServiceClient.fetch [as fetchFn] (http://localhost:5173/src/services/temporal-baseline.ts:4:98)
+    at InfrastructureServiceClient.getTemporalBaseline (http://localhost:5173/src/generated/client/worldmonitor/infrastructure/v1/service_client.ts:84:29)
+    at checkAnomaly (http://localhost:5173/src/services/temporal-baseline.ts:82:31)
+    at http://localhost:5173/src/services/temporal-baseline.ts:104:27
+    at Array.map (<anonymous>)
+    at updateAndCheck (http://localhost:5173/src/services/temporal-baseline.ts:104:16)
+    at http://localhost:5173/src/app/data-loader.ts:1410:9
+    at async Promise.allSettled (index 5)
+    at async DataLoaderManager.loadIntelligenceSignals (http://localhost:5173/src/app/data-loader.ts:1568:5)
+    at async runGuarded (http://localhost:5173/src/app/data-loader.ts:290:9) @ http://localhost:5173/src/services/temporal-baseline.ts:93
+[    2340ms] [WARNING] [TemporalBaseline] Check failed: TypeError: Failed to fetch
+    at InfrastructureServiceClient.fetch [as fetchFn] (http://localhost:5173/src/services/temporal-baseline.ts:4:98)
+    at InfrastructureServiceClient.getTemporalBaseline (http://localhost:5173/src/generated/client/worldmonitor/infrastructure/v1/service_client.ts:84:29)
+    at checkAnomaly (http://localhost:5173/src/services/temporal-baseline.ts:82:31)
+    at http://localhost:5173/src/services/temporal-baseline.ts:104:27
+    at Array.map (<anonymous>)
+    at updateAndCheck (http://localhost:5173/src/services/temporal-baseline.ts:104:16)
+    at http://localhost:5173/src/app/data-loader.ts:1410:9
+    at async Promise.allSettled (index 5)
+    at async DataLoaderManager.loadIntelligenceSignals (http://localhost:5173/src/app/data-loader.ts:1568:5)
+    at async runGuarded (http://localhost:5173/src/app/data-loader.ts:290:9) @ http://localhost:5173/src/services/temporal-baseline.ts:93
+[    2340ms] [WARNING] [TemporalBaseline] Update failed: TypeError: Failed to fetch
+    at InfrastructureServiceClient.fetch [as fetchFn] (http://localhost:5173/src/services/temporal-baseline.ts:4:98)
+    at InfrastructureServiceClient.recordBaselineSnapshot (http://localhost:5173/src/generated/client/worldmonitor/infrastructure/v1/service_client.ts:102:29)
+    at reportMetrics (http://localhost:5173/src/services/temporal-baseline.ts:75:18)
+    at updateAndCheck (http://localhost:5173/src/services/temporal-baseline.ts:101:3)
+    at http://localhost:5173/src/app/data-loader.ts:1410:9
+    at async Promise.allSettled (index 5)
+    at async DataLoaderManager.loadIntelligenceSignals (http://localhost:5173/src/app/data-loader.ts:1568:5)
+    at async runGuarded (http://localhost:5173/src/app/data-loader.ts:290:9) @ http://localhost:5173/src/services/temporal-baseline.ts:76
+[    2340ms] [ERROR] [Wildfires] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [UCDP Events] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [Climate Anomalies] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [UCDP Events] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [WARNING] [UCDP Events] On cooldown for 300s after 2 failures @ http://localhost:5173/src/utils/circuit-breaker.ts:218
+[    2340ms] [ERROR] [Seismology] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [UNHCR Displacement] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [Chokepoint Status] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [NaturalEvents] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [HDX HAPI Batch] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [GDELT Tensions] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [USNI Fleet Tracker] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [PizzINT] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2340ms] [ERROR] [Commodity Quotes] Failed: TypeError: Failed to fetch @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    2359ms] [ERROR] Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'sha256-LnMFPWZxTgVOr2VYwIh9mhQ3l/l3+a3SfNOLERnuHfY=' 'sha256-+SFBjfmi2XfnyAT3POBxf6JIKYDcNXtllPclOcaNBI0=' 'sha256-AhZAmdCW6h8iXMyBcvIrqN71FGNk4lwLD+lPxx43hxg=' 'sha256-PnEBZii+iFaNE2EyXaJhRq34g6bdjRJxpLfJALdXYt8=' 'sha256-cVhuR63Moy56DV5yG0caJCEyCugMTbYclkvkK6fSwXY=' 'sha256-4Z2xtr1B9QQugoojE/nbpOViG+8l2B7CZVlKgC78AeQ=' 'wasm-unsafe-eval' https://www.youtube.com https://static.cloudflareinsights.com https://vercel.live'. Either the 'unsafe-inline' keyword, a hash ('sha256-903UI9my1I7mqHoiVeZSc56yd50YoRJTB2269QqL76w='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked. @ http://localhost:5173/?lat=20.0000&lon=0.0000&zoom=1.00&view=global&timeRange=7d&layers=conflicts%2Cbases%2Chotspots%2Cnuclear%2Csanctions%2Cweather%2Ceconomic%2Cwaterways%2Coutages%2Cmilitary%2Cnatural%2CiranAttacks:260
+[    3093ms] [ERROR] [feeds] DEFAULT_ENABLED name "Breaking Defense" not found in FULL_FEEDS! @ http://localhost:5173/src/config/feeds.ts:1347
+[    3253ms] [WARNING] THREE.THREE.Clock: This module has been deprecated. Please use THREE.Timer instead. @ http://localhost:5173/node_modules/.vite/deps/chunk-JENIRZW7.js?v=a9a232d4:296
+[    3257ms] [ERROR] Loading the script 'https://va.vercel-scripts.com/v1/script.debug.js' violates the following Content Security Policy directive: "script-src 'self' 'sha256-LnMFPWZxTgVOr2VYwIh9mhQ3l/l3+a3SfNOLERnuHfY=' 'sha256-+SFBjfmi2XfnyAT3POBxf6JIKYDcNXtllPclOcaNBI0=' 'sha256-AhZAmdCW6h8iXMyBcvIrqN71FGNk4lwLD+lPxx43hxg=' 'sha256-PnEBZii+iFaNE2EyXaJhRq34g6bdjRJxpLfJALdXYt8=' 'sha256-cVhuR63Moy56DV5yG0caJCEyCugMTbYclkvkK6fSwXY=' 'sha256-4Z2xtr1B9QQugoojE/nbpOViG+8l2B7CZVlKgC78AeQ=' 'wasm-unsafe-eval' https://www.youtube.com https://static.cloudflareinsights.com https://vercel.live". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked. @ http://localhost:5173/node_modules/.vite/deps/@vercel_analytics.js?v=a9a232d4:185
+[    3264ms] [ERROR] The script has an unsupported MIME type ('text/html'). @ :0
+[    3309ms] [WARNING] [PWA] Service worker registration failed: SecurityError: Failed to register a ServiceWorker for scope ('http://localhost:5173/') with script ('http://localhost:5173/sw.js'): The script has an unsupported MIME type ('text/html'). @ http://localhost:5173/src/main.ts:368
+[    3517ms] [WARNING] [GDELT-Intel] RPC error: GDELT returned 429 @ http://localhost:5173/src/services/gdelt-intel.ts:128
+[    3550ms] [ERROR] [App] Telegram intel fetch failed: SyntaxError: Unexpected token 'i', "import { g"... is not valid JSON @ http://localhost:5173/src/app/data-loader.ts:2394
+[    3551ms] [ERROR] Failed to load resource: the server responded with a status of 503 (Service Unavailable) @ http://localhost:5173/api/gpsjam:0
+[    3578ms] [ERROR] [App] Telegram intel fetch failed: SyntaxError: Unexpected token 'i', "import { g"... is not valid JSON @ http://localhost:5173/src/app/data-loader.ts:2394
+[    3580ms] [ERROR] [Military Flight Tracking] Failed: SyntaxError: Unexpected token 'i', "import { g"... is not valid JSON @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    3600ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5173/api/forecast/v1/get-forecasts:0
+[    3611ms] [ERROR] [Polymarket] Failed: Error: No markets returned — upstream may be down @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    3620ms] [ERROR] [NWS Weather] Failed: SyntaxError: Unexpected token 'i', "import { g"... is not valid JSON @ http://localhost:5173/src/utils/circuit-breaker.ts:274
+[    9156ms] [WARNING] [Summarization] All providers failed @ http://localhost:5173/src/services/summarization.ts:170
+[    9157ms] [WARNING] [Summarization] All providers failed @ http://localhost:5173/src/services/summarization.ts:170
+[    9157ms] [WARNING] [Summarization] All providers failed @ http://localhost:5173/src/services/summarization.ts:170
+[    9157ms] [WARNING] [Summarization] All providers failed @ http://localhost:5173/src/services/summarization.ts:170
+[    9157ms] [WARNING] [Summarization] All providers failed @ http://localhost:5173/src/services/summarization.ts:170
+[    9524ms] [WARNING] [Summarization] All providers failed @ http://localhost:5173/src/services/summarization.ts:170
+[   18544ms] [WARNING] [GDELT-Intel] RPC error: GDELT returned 429 @ http://localhost:5173/src/services/gdelt-intel.ts:128
+[   33574ms] [WARNING] [GDELT-Intel] RPC error: GDELT returned 429 @ http://localhost:5173/src/services/gdelt-intel.ts:128
