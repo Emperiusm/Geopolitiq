@@ -1,5 +1,5 @@
 import { getDb } from "./mongo";
-import { getDecryptedLLMKey } from "./user-settings";
+import { getDecryptedLLMKey, decrypt } from "./user-settings";
 import { publishEvent } from "./sse";
 import type { LLMProvider, NewsAnalysis } from "../types";
 
@@ -161,6 +161,7 @@ export function parseAnalysisResponse(raw: string): {
 /** Run Tier 2 analysis for a user on a set of article clusters */
 export async function analyzeForUser(
   userId: string,
+  teamId: string,
   clusters: ArticleCluster[],
 ): Promise<number> {
   const credentials = await getDecryptedLLMKey(userId);
@@ -194,6 +195,7 @@ export async function analyzeForUser(
       provider: credentials.provider,
       model: credentials.model,
       userId,
+      teamId,
       analyzedAt: new Date(),
     };
 
@@ -202,12 +204,53 @@ export async function analyzeForUser(
       articleIds: sortedIds,
       summary: parsed.summary,
       escalationSignal: parsed.escalationSignal,
+      teamId,
     });
 
     analyzed++;
   }
 
   return analyzed;
+}
+
+/** Resolve the BYOK API key to use for analysis, following priority order */
+export async function resolveBYOKKey(
+  userId: string,
+  teamId: string,
+  trigger: "user" | "team",
+): Promise<{ provider: string; apiKey: string; model: string } | null> {
+  if (trigger === "team") {
+    const db = getDb();
+    const teamSettings = await db.collection("teamSettings").findOne({ _id: teamId });
+    if (teamSettings?.llmApiKey && teamSettings?.aiAnalysisEnabled) {
+      try {
+        return {
+          provider: teamSettings.llmProvider,
+          apiKey: decrypt(teamSettings.llmApiKey),
+          model: teamSettings.llmModel || (teamSettings.llmProvider === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o"),
+        };
+      } catch { return null; }
+    }
+    return null;
+  }
+
+  // User-triggered: personal key → team key → null
+  const personal = await getDecryptedLLMKey(userId);
+  if (personal) return personal;
+
+  const db = getDb();
+  const teamSettings = await db.collection("teamSettings").findOne({ _id: teamId });
+  if (teamSettings?.llmApiKey && teamSettings?.aiAnalysisEnabled) {
+    try {
+      return {
+        provider: teamSettings.llmProvider,
+        apiKey: decrypt(teamSettings.llmApiKey),
+        model: teamSettings.llmModel || (teamSettings.llmProvider === "anthropic" ? "claude-sonnet-4-20250514" : "gpt-4o"),
+      };
+    } catch { return null; }
+  }
+
+  return null;
 }
 
 /** Get all users with AI analysis enabled */

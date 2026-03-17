@@ -52,4 +52,11 @@ export async function ensureAuthIndexes(): Promise<void> {
     { expireAfterSeconds: 0 },
   );
   await db.collection("recoveryTokens").createIndex({ userId: 1 });
+
+  // Ensure platformConfig singleton exists
+  await db.collection("platformConfig").updateOne(
+    { _id: "config" },
+    { $setOnInsert: { firstUserClaimed: false } },
+    { upsert: true },
+  );
 }

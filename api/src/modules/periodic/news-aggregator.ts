@@ -222,7 +222,9 @@ async function pollTier(tier: FeedTier): Promise<{ fetched: number; inserted: nu
           const clusters = clusterArticles(recentArticles);
           if (clusters.length > 0) {
             for (const userId of userIds) {
-              await analyzeForUser(userId, clusters).catch((err) =>
+              const userDoc = await getDb().collection("users").findOne({ _id: userId }, { projection: { teamId: 1 } });
+              const teamId = (userDoc?.teamId as string) ?? "";
+              await analyzeForUser(userId, teamId, clusters).catch((err) =>
                 console.error(`[news] AI analysis error for ${userId}:`, err),
               );
             }
