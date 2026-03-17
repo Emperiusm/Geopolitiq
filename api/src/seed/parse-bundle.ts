@@ -10,8 +10,8 @@ const DATA_DIR = resolve(import.meta.dir, "../../../.firecrawl");
  */
 async function evalJsFile(filename: string, varName: string): Promise<unknown> {
   let raw = await readFile(resolve(DATA_DIR, filename), "utf-8");
-  // Remove backslash-escaped brackets — extraction artifact, not valid JS
-  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]");
+  // Remove extraction artifacts: \[ \] \` are not valid JS escape sequences
+  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]").replaceAll("\\`", "`");
   const fn = new Function(`${raw}\nreturn ${varName};`);
   return fn();
 }
@@ -29,7 +29,7 @@ export async function parseBases(): Promise<any[]> {
 /** Parse hegemon-nsa-full.js -> [{ id, name, ideology, ... }] */
 export async function parseNSA(): Promise<any[]> {
   let raw = await readFile(resolve(DATA_DIR, "hegemon-nsa-full.js"), "utf-8");
-  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]");
+  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]").replaceAll("\\`", "`");
 
   // Try direct eval first (file may define `const NSA = [...]`)
   try {
