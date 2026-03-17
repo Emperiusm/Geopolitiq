@@ -10,7 +10,7 @@ import type { SatellitePosition } from '@/services/satellites';
 import { isDesktopRuntime } from '@/services/runtime';
 import {
   getGlobeRenderScale, resolveGlobePixelRatio,
-  type GlobeRenderScale, type GlobePerformanceProfile, type GlobeVisualPreset,
+  type GlobeRenderScale, type GlobePerformanceProfile,
 } from '@/services/globe-render-settings';
 import type { GlobePath } from './globe-map-types';
 

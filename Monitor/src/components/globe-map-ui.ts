@@ -11,8 +11,6 @@ import { getSecretState } from '@/services/runtime-config';
 import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVariant } from '@/config/map-layer-definitions';
 import { showLayerWarning } from '@/utils/layer-warning';
 import type { MapLayers } from '@/types';
-import type { MapView } from './MapContainer';
-
 // ─── Zoom controls ───────────────────────────────────────────────────────────
 
 export function createControls(

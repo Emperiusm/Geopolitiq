@@ -15,7 +15,6 @@ import { pinWebcam, isPinned } from '@/services/webcams/pinned-store';
 import { MapPopup } from './MapPopup';
 import type {
   GlobeMarker, SatelliteMarker, SatFootprintMarker,
-  SAT_COUNTRY_COLORS as SAT_COUNTRY_COLORS_TYPE,
 } from './globe-map-types';
 import {
   SAT_COUNTRY_COLORS, SAT_TYPE_EMOJI, SAT_TYPE_LABEL, SAT_OPERATOR_NAME,

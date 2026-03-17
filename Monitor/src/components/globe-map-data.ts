@@ -9,8 +9,16 @@
 import type {
   Hotspot, MilitaryFlight, MilitaryVessel, MilitaryVesselCluster,
   NaturalEvent, InternetOutage, CyberThreat, SocialUnrestEvent,
-  UcdpGeoEvent, CableAdvisory, RepairShip, AisDisruptionEvent, AisDensityZone,
+  UcdpGeoEvent, CableAdvisory, RepairShip, AisDisruptionEvent,
+  MilitaryBase, GammaIrradiator, Spaceport, EconomicCenter, StrategicWaterway,
+  CriticalMineralProject, AIDataCenter, UnderseaCable, Pipeline,
 } from '@/types';
+import { CONFLICT_ZONES, MILITARY_BASES, NUCLEAR_FACILITIES, SPACEPORTS, ECONOMIC_CENTERS, STRATEGIC_WATERWAYS, CRITICAL_MINERALS, UNDERSEA_CABLES } from '@/config/geo';
+import { PIPELINES } from '@/config/pipelines';
+import { GAMMA_IRRADIATORS } from '@/config/irradiators';
+import { AI_DATA_CENTERS } from '@/config/ai-datacenters';
+import { resolveTradeRouteSegments, type TradeRouteSegment } from '@/config/trade-routes';
+import type { FeatureCollection, Geometry } from 'geojson';
 import type { Earthquake } from '@/services/earthquakes';
 import type { AirportDelayAlert } from '@/services/aviation';
 import type { WeatherAlert } from '@/services/weather';
@@ -27,13 +35,16 @@ import type {
   WeatherMarker, NaturalMarker, IranMarker, OutageMarker,
   CyberMarker, FireMarker, ProtestMarker, UcdpMarker,
   DisplacementMarker, ClimateMarker, GpsJamMarker, TechMarker,
-  EarthquakeMarker, FlightDelayMarker, NotamRingMarker,
+  ConflictZoneMarker, MilBaseMarker, NuclearSiteMarker, IrradiatorSiteMarker,
+  SpaceportSiteMarker, EarthquakeMarker, EconomicMarker, DatacenterMarker,
+  WaterwayMarker, MineralMarker, FlightDelayMarker, NotamRingMarker,
   CableAdvisoryMarker, RepairShipMarker, AisDisruptionMarker,
-  NewsLocationMarker, SatelliteMarker, SatFootprintMarker,
+  NewsLocationMarker, FlashMarker, SatelliteMarker, SatFootprintMarker,
   ImagerySceneMarker, WebcamMarkerData, WebcamClusterData,
-  GlobePath, GlobePolygon,
+  GlobePath, GlobePolygon, GlobeMarker,
 } from './globe-map-types';
 import { VESSEL_TYPE_LABELS } from './globe-map-types';
+import type { MapLayers } from '@/types';
 
 // ─── Data transformation helpers ─────────────────────────────────────────────
 
@@ -491,4 +502,192 @@ export function transformImageryScenes(scenes: ImageryScene[]): {
     };
   });
   return { sceneMarkers, footprintPolygons };
+}
+
+// ─── Static layer initialization ──────────────────────────────────────────────
+
+export interface StaticLayerData {
+  milBaseMarkers: MilBaseMarker[];
+  nuclearSiteMarkers: NuclearSiteMarker[];
+  irradiatorSiteMarkers: IrradiatorSiteMarker[];
+  spaceportSiteMarkers: SpaceportSiteMarker[];
+  economicMarkers: EconomicMarker[];
+  datacenterMarkers: DatacenterMarker[];
+  waterwayMarkers: WaterwayMarker[];
+  mineralMarkers: MineralMarker[];
+  tradeRouteSegments: TradeRouteSegment[];
+  globePaths: GlobePath[];
+  conflictZoneMarkers: ConflictZoneMarker[];
+}
+
+export function initStaticLayers(): StaticLayerData {
+  const milBaseMarkers: MilBaseMarker[] = (MILITARY_BASES as MilitaryBase[]).map(b => ({
+    _kind: 'milbase' as const, _lat: b.lat, _lng: b.lon, id: b.id, name: b.name, type: b.type, country: b.country ?? '',
+  }));
+  const nuclearSiteMarkers: NuclearSiteMarker[] = NUCLEAR_FACILITIES
+    .filter(f => f.status !== 'decommissioned')
+    .map(f => ({ _kind: 'nuclearSite' as const, _lat: f.lat, _lng: f.lon, id: f.id, name: f.name, type: f.type, status: f.status }));
+  const irradiatorSiteMarkers: IrradiatorSiteMarker[] = (GAMMA_IRRADIATORS as GammaIrradiator[]).map(g => ({
+    _kind: 'irradiator' as const, _lat: g.lat, _lng: g.lon, id: g.id, city: g.city, country: g.country,
+  }));
+  const spaceportSiteMarkers: SpaceportSiteMarker[] = (SPACEPORTS as Spaceport[])
+    .filter(s => s.status === 'active')
+    .map(s => ({ _kind: 'spaceport' as const, _lat: s.lat, _lng: s.lon, id: s.id, name: s.name, country: s.country, operator: s.operator, launches: s.launches }));
+  const economicMarkers: EconomicMarker[] = (ECONOMIC_CENTERS as EconomicCenter[]).map(c => ({
+    _kind: 'economic' as const, _lat: c.lat, _lng: c.lon, id: c.id, name: c.name, type: c.type, country: c.country, description: c.description ?? '',
+  }));
+  const datacenterMarkers: DatacenterMarker[] = (AI_DATA_CENTERS as AIDataCenter[])
+    .filter(d => d.status !== 'decommissioned')
+    .map(d => ({ _kind: 'datacenter' as const, _lat: d.lat, _lng: d.lon, id: d.id, name: d.name, owner: d.owner, country: d.country, chipType: d.chipType }));
+  const waterwayMarkers: WaterwayMarker[] = (STRATEGIC_WATERWAYS as StrategicWaterway[]).map(w => ({
+    _kind: 'waterway' as const, _lat: w.lat, _lng: w.lon, id: w.id, name: w.name, description: w.description ?? '',
+  }));
+  const mineralMarkers: MineralMarker[] = (CRITICAL_MINERALS as CriticalMineralProject[])
+    .filter(m => m.status === 'producing' || m.status === 'development')
+    .map(m => ({ _kind: 'mineral' as const, _lat: m.lat, _lng: m.lon, id: m.id, name: m.name, mineral: m.mineral, country: m.country, status: m.status }));
+  const tradeRouteSegments = resolveTradeRouteSegments();
+  const globePaths: GlobePath[] = [
+    ...(UNDERSEA_CABLES as UnderseaCable[]).map(c => ({ id: c.id, name: c.name, points: c.points, pathType: 'cable' as const, status: 'ok' })),
+    ...(PIPELINES as Pipeline[]).map(p => ({ id: p.id, name: p.name, points: p.points, pathType: p.type, status: p.status })),
+  ];
+  const conflictZoneMarkers: ConflictZoneMarker[] = CONFLICT_ZONES.map(z => ({
+    _kind: 'conflictZone' as const, _lat: z.center[1], _lng: z.center[0], id: z.id, name: z.name,
+    intensity: z.intensity ?? 'low', parties: z.parties ?? [], casualties: z.casualties,
+  }));
+  return { milBaseMarkers, nuclearSiteMarkers, irradiatorSiteMarkers, spaceportSiteMarkers, economicMarkers, datacenterMarkers, waterwayMarkers, mineralMarkers, tradeRouteSegments, globePaths, conflictZoneMarkers };
+}
+
+// ─── Marker assembly for flush ────────────────────────────────────────────────
+
+export function assembleVisibleMarkers(
+  layers: MapLayers,
+  data: {
+    hotspots: HotspotMarker[];
+    conflictZoneMarkers: ConflictZoneMarker[];
+    milBaseMarkers: MilBaseMarker[];
+    nuclearSiteMarkers: NuclearSiteMarker[];
+    irradiatorSiteMarkers: IrradiatorSiteMarker[];
+    spaceportSiteMarkers: SpaceportSiteMarker[];
+    flights: FlightMarker[];
+    vessels: VesselMarker[];
+    clusterMarkers: ClusterMarker[];
+    weatherMarkers: WeatherMarker[];
+    naturalMarkers: NaturalMarker[];
+    earthquakeMarkers: EarthquakeMarker[];
+    economicMarkers: EconomicMarker[];
+    datacenterMarkers: DatacenterMarker[];
+    waterwayMarkers: WaterwayMarker[];
+    mineralMarkers: MineralMarker[];
+    flightDelayMarkers: FlightDelayMarker[];
+    notamRingMarkers: NotamRingMarker[];
+    aisMarkers: AisDisruptionMarker[];
+    iranMarkers: IranMarker[];
+    outageMarkers: OutageMarker[];
+    cyberMarkers: CyberMarker[];
+    fireMarkers: FireMarker[];
+    protestMarkers: ProtestMarker[];
+    ucdpMarkers: UcdpMarker[];
+    displacementMarkers: DisplacementMarker[];
+    climateMarkers: ClimateMarker[];
+    gpsJamMarkers: GpsJamMarker[];
+    satelliteMarkers: SatelliteMarker[];
+    satelliteFootprintMarkers: SatFootprintMarker[];
+    imagerySceneMarkers: ImagerySceneMarker[];
+    techMarkers: TechMarker[];
+    cableAdvisoryMarkers: CableAdvisoryMarker[];
+    repairShipMarkers: RepairShipMarker[];
+    webcamMarkers: (WebcamMarkerData | WebcamClusterData)[];
+    newsLocationMarkers: NewsLocationMarker[];
+    flashMarkers: FlashMarker[];
+  },
+): GlobeMarker[] {
+  const markers: GlobeMarker[] = [];
+  if (layers.hotspots) markers.push(...data.hotspots);
+  if (layers.conflicts) markers.push(...data.conflictZoneMarkers);
+  if (layers.bases) markers.push(...data.milBaseMarkers);
+  if (layers.nuclear) markers.push(...data.nuclearSiteMarkers);
+  if (layers.irradiators) markers.push(...data.irradiatorSiteMarkers);
+  if (layers.spaceports) markers.push(...data.spaceportSiteMarkers);
+  if (layers.military) { markers.push(...data.flights, ...data.vessels, ...data.clusterMarkers); }
+  if (layers.weather) markers.push(...data.weatherMarkers);
+  if (layers.natural) { markers.push(...data.naturalMarkers, ...data.earthquakeMarkers); }
+  if (layers.economic) markers.push(...data.economicMarkers);
+  if (layers.datacenters) markers.push(...data.datacenterMarkers);
+  if (layers.waterways) markers.push(...data.waterwayMarkers);
+  if (layers.minerals) markers.push(...data.mineralMarkers);
+  if (layers.flights) { markers.push(...data.flightDelayMarkers, ...data.notamRingMarkers); }
+  if (layers.ais) markers.push(...data.aisMarkers);
+  if (layers.iranAttacks) markers.push(...data.iranMarkers);
+  if (layers.outages) markers.push(...data.outageMarkers);
+  if (layers.cyberThreats) markers.push(...data.cyberMarkers);
+  if (layers.fires) markers.push(...data.fireMarkers);
+  if (layers.protests) markers.push(...data.protestMarkers);
+  if (layers.ucdpEvents) markers.push(...data.ucdpMarkers);
+  if (layers.displacement) markers.push(...data.displacementMarkers);
+  if (layers.climate) markers.push(...data.climateMarkers);
+  if (layers.gpsJamming) markers.push(...data.gpsJamMarkers);
+  if (layers.satellites) { markers.push(...data.satelliteMarkers, ...data.satelliteFootprintMarkers, ...data.imagerySceneMarkers); }
+  if (layers.techEvents) markers.push(...data.techMarkers);
+  if (layers.cables) { markers.push(...data.cableAdvisoryMarkers, ...data.repairShipMarkers); }
+  if (layers.webcams) markers.push(...data.webcamMarkers);
+  markers.push(...data.newsLocationMarkers, ...data.flashMarkers);
+  return markers;
+}
+
+// ─── Polygon assembly for flush ───────────────────────────────────────────────
+
+export function assemblePolygons(
+  layers: MapLayers,
+  countriesGeoData: FeatureCollection<Geometry> | null,
+  ciiScoresMap: Map<string, { score: number; level: string }>,
+  imageryFootprintPolygons: GlobePolygon[],
+  stormConePolygons: GlobePolygon[],
+  getReversedRing: (zoneId: string, countryIso: string, ringIdx: number, ring: number[][][]) => number[][][],
+): GlobePolygon[] {
+  const polys: GlobePolygon[] = [];
+
+  if (layers.conflicts) {
+    const CONFLICT_ISO: Record<string, string[]> = {
+      iran: ['IR'], ukraine: ['UA'], gaza: ['PS', 'IL'], sudan: ['SD'], myanmar: ['MM'],
+    };
+    for (const z of CONFLICT_ZONES) {
+      const isoCodes = CONFLICT_ISO[z.id];
+      if (isoCodes && countriesGeoData) {
+        for (const feat of countriesGeoData.features) {
+          const code = feat.properties?.['ISO3166-1-Alpha-2'] as string | undefined;
+          if (!code || !isoCodes.includes(code)) continue;
+          const geom = feat.geometry;
+          if (!geom) continue;
+          const rings = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+          for (let ri = 0; ri < rings.length; ri++) {
+            polys.push({
+              coords: getReversedRing(z.id, code, ri, rings[ri] as number[][][]),
+              name: z.name, _kind: 'conflict',
+              intensity: z.intensity ?? 'low', parties: z.parties, casualties: z.casualties,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  if (layers.ciiChoropleth && countriesGeoData) {
+    for (const feat of countriesGeoData.features) {
+      const code = feat.properties?.['ISO3166-1-Alpha-2'] as string | undefined;
+      const entry = code ? ciiScoresMap.get(code) : undefined;
+      if (!entry || !code) continue;
+      const geom = feat.geometry;
+      if (!geom) continue;
+      const rings = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+      const name = (feat.properties?.name as string) ?? code;
+      for (const ring of rings) {
+        polys.push({ coords: ring, name, _kind: 'cii', level: entry.level, score: entry.score });
+      }
+    }
+  }
+
+  if (layers.satellites) polys.push(...imageryFootprintPolygons);
+  if (layers.natural) polys.push(...stormConePolygons);
+
+  return polys;
 }

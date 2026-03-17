@@ -1,5 +1,5 @@
 import { fetchLiveVideoInfo } from '@/services/live-news';
-import { isDesktopRuntime, getRemoteApiBaseUrl, getApiBaseUrl, getLocalApiPort } from '@/services/runtime';
+import { isDesktopRuntime, getRemoteApiBaseUrl, getLocalApiPort } from '@/services/runtime';
 import { getStreamQuality } from '@/services/ai-flow-settings';
 import { SITE_VARIANT } from '@/config';
 import { DIRECT_HLS_MAP, PROXIED_HLS_MAP } from './live-news-channels';

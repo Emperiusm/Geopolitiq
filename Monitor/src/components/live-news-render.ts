@@ -155,6 +155,66 @@ export function createDesktopEmbedIframe(
   return iframe;
 }
 
+/** Wire up mouse-based drag-reorder on a channel switcher element.
+ *  Returns nothing; registers mousedown/mousemove/mouseup handlers.
+ */
+export function setupDragReorder(
+  switcherEl: HTMLElement,
+  opts: {
+    onReorder: () => void;
+    getSuppressClick: () => boolean;
+    setSuppressClick: (v: boolean) => void;
+  },
+): void {
+  let dragging: HTMLElement | null = null;
+  let dragStarted = false;
+  let startX = 0;
+  const THRESHOLD = 6;
+
+  switcherEl.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const btn = (e.target as HTMLElement).closest('.live-channel-btn') as HTMLElement | null;
+    if (!btn) return;
+    opts.setSuppressClick(false);
+    dragging = btn;
+    dragStarted = false;
+    startX = e.clientX;
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    if (!dragStarted) {
+      if (Math.abs(e.clientX - startX) < THRESHOLD) return;
+      dragStarted = true;
+      dragging.classList.add('live-channel-dragging');
+    }
+    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.live-channel-btn') as HTMLElement | null;
+    if (!target || target === dragging) return;
+    const all = Array.from(switcherEl.querySelectorAll('.live-channel-btn'));
+    const idx = all.indexOf(dragging);
+    const targetIdx = all.indexOf(target);
+    if (idx === -1 || targetIdx === -1) return;
+    if (idx < targetIdx) {
+      target.parentElement?.insertBefore(dragging, target.nextSibling);
+    } else {
+      target.parentElement?.insertBefore(dragging, target);
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    if (dragStarted) {
+      dragging.classList.remove('live-channel-dragging');
+      opts.onReorder();
+      opts.setSuppressClick(true);
+      setTimeout(() => opts.setSuppressClick(false), 0);
+    }
+    dragging = null;
+    dragStarted = false;
+  });
+}
+
 /** Create the channel management modal overlay. Returns { overlay, container, close }. */
 export function createChannelManagementModal(
   onClose: () => void,
