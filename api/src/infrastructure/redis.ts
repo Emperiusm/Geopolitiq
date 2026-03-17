@@ -3,7 +3,7 @@ import Redis from "ioredis";
 let redis: Redis | null = null;
 
 export async function connectRedis(url?: string): Promise<Redis> {
-  const redisUrl = url ?? process.env.REDIS_URL ?? "redis://localhost:6379";
+  const redisUrl = url ?? process.env.REDIS_URL ?? "redis://localhost:6380";
   redis = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
     retryStrategy(times) {

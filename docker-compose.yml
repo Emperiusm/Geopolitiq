@@ -6,7 +6,7 @@ services:
     ports: ["3000:3000"]
     environment:
       MONGO_URI: mongodb://mongo:27017/gambit
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://redis:6379  # internal Docker network — container port stays 6379
       API_KEY: ${API_KEY:-dev}
       PORT: "3000"
       NODE_ENV: development
@@ -26,7 +26,7 @@ services:
   redis:
     container_name: gambit-redis
     image: redis:7-alpine
-    ports: ["6379:6379"]
+    ports: ["6380:6379"]
 
   mongo-express:
     container_name: gambit-mongo-express
