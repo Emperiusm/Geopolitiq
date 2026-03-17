@@ -38,6 +38,8 @@ import { startNewsAggregator } from "./modules/periodic/news-aggregator";
 import { settingsRoutes } from "./modules/system/settings-routes";
 import { mountPlugins } from "./infrastructure/plugin-registry";
 import { pluginRoutes } from "./modules/system/plugin-routes";
+import { anomaliesRouter } from "./modules/aggregate/anomalies";
+import { startAnomalyCleanup } from "./modules/periodic/anomaly-cleanup";
 
 const app = new Hono();
 
@@ -73,6 +75,7 @@ api.route("/timeline", timelineRouter);
 api.route("/graph", graphRouter);
 api.route("/settings", settingsRoutes);
 api.route("/plugins", pluginRoutes);
+api.route("/anomalies", anomaliesRouter);
 
 app.route("/api/v1", api);
 
@@ -112,6 +115,7 @@ async function start() {
   const pluginCount = await mountPlugins();
   if (pluginCount > 0) console.log(`[gambit] ${pluginCount} plugins mounted`);
   startConflictCounter();
+  startAnomalyCleanup();
   startNewsAggregator();
 }
 

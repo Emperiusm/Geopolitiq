@@ -5,6 +5,7 @@ import { enrichNewsItem } from "../../infrastructure/enrichment";
 import { publishEvent } from "../../infrastructure/sse";
 import { captureSnapshot } from "../../infrastructure/snapshots";
 import { clusterArticles, analyzeForUser, getAIEnabledUsers } from "../../infrastructure/ai-analysis";
+import { recordAndDetect } from "../../infrastructure/anomaly-detector";
 import type { GraphEdge } from "../../types";
 
 const BATCH_CONCURRENCY = Number(process.env.NEWS_BATCH_CONCURRENCY ?? 15);
@@ -156,6 +157,11 @@ async function processArticle(article: ParsedArticle): Promise<boolean> {
   if (edges.length > 0) {
     await db.collection("edges").insertMany(edges);
   }
+
+  // Anomaly detection
+  await recordAndDetect(enriched, tags).catch((err) =>
+    console.error("[news] Anomaly detection error:", err),
+  );
 
   // Publish SSE event
   await publishEvent("news-enriched", {
