@@ -4,12 +4,14 @@ import { resolve } from "path";
 const DATA_DIR = resolve(import.meta.dir, "../../../.firecrawl");
 
 /**
- * Read a .js file and evaluate it as JS, returning the declared variable.
- * Files use `const NAME = <data>` format. We execute the whole file and return the var.
- * This avoids escape-handling issues from trying to strip/clean the content.
+ * Read a .js file, clean extraction artifacts, and evaluate as JS.
+ * The scraped files have `\[` and `\]` around array literals (invalid JS)
+ * from the extraction process. We strip those before evaluating.
  */
 async function evalJsFile(filename: string, varName: string): Promise<unknown> {
-  const raw = await readFile(resolve(DATA_DIR, filename), "utf-8");
+  let raw = await readFile(resolve(DATA_DIR, filename), "utf-8");
+  // Remove backslash-escaped brackets — extraction artifact, not valid JS
+  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]");
   const fn = new Function(`${raw}\nreturn ${varName};`);
   return fn();
 }
@@ -26,17 +28,16 @@ export async function parseBases(): Promise<any[]> {
 
 /** Parse hegemon-nsa-full.js -> [{ id, name, ideology, ... }] */
 export async function parseNSA(): Promise<any[]> {
-  // NSA file has irregular format — try evaluating as-is first
-  const raw = await readFile(resolve(DATA_DIR, "hegemon-nsa-full.js"), "utf-8");
+  let raw = await readFile(resolve(DATA_DIR, "hegemon-nsa-full.js"), "utf-8");
+  raw = raw.replaceAll("\\[", "[").replaceAll("\\]", "]");
 
-  // Try direct eval (file may define `const NSA = [...]`)
+  // Try direct eval first (file may define `const NSA = [...]`)
   try {
     const fn = new Function(`${raw}\nreturn NSA;`);
     const result = fn();
     return Array.isArray(result) ? result : [result];
   } catch {
     // Fallback: file may start with `const NSA=` followed by bare properties
-    // Wrap in array/object and retry
     let content = raw.replace(/^const\s+NSA\s*=\s*/, "").replace(/;\s*$/, "");
     if (!content.trimStart().startsWith("[")) {
       content = `[{${content.trimStart().startsWith("{") ? content.trimStart().slice(1) : content}}]`;
