@@ -224,6 +224,9 @@ export interface NewsEvent extends DocMeta {
   sourceCount: number;
   conflictId: string | null;
   relatedCountries: string[];
+  relatedChokepoints: string[];
+  relatedNSA: string[];
+  enrichedAt: Date | null;
   publishedAt: Date;
 }
 

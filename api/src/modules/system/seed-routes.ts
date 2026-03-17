@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getDb } from "../../infrastructure/mongo";
 import { seedAll } from "../../seed/seed-all";
+import { buildEntityDictionary } from "../../infrastructure/entity-dictionary";
 import { apiError, success } from "../../helpers/response";
 
 export const seedRoutes = new Hono();
@@ -11,6 +12,7 @@ seedRoutes.post("/run", async (c) => {
   }
   try {
     const results = await seedAll();
+    await buildEntityDictionary();
     return success(c, results);
   } catch (err: any) {
     return apiError(c, "INTERNAL_ERROR", err.message ?? "Seed failed", 500);
