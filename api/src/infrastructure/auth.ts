@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import { getDb } from "./mongo";
-import type { UserRole, PlatformRole, AuditAction, TeamPlan } from "../types/auth";
+import type { UserRole, PlatformRole, AuditAction, TeamPlan, OAuthProfile, FindOrCreateResult, User } from "../types/auth";
 
 // --- JWT ---
 
@@ -164,4 +164,262 @@ export function teamScope(teamId: string): { teamId: string } {
 
 export function userScope(userId: string): { userId: string } {
   return { userId };
+}
+
+// --- findOrCreateUser ---
+
+export async function findOrCreateUser(
+  profile: OAuthProfile,
+  inviteCode?: string,
+): Promise<FindOrCreateResult> {
+  const db = getDb();
+  const now = new Date();
+
+  // 1. Look up by provider + providerId
+  const existingByProvider = await db.collection("users").findOne({
+    "providers.provider": profile.provider,
+    "providers.providerId": profile.providerId,
+  }) as User | null;
+
+  if (existingByProvider) {
+    const updates: Record<string, any> = { lastLoginAt: now, updatedAt: now };
+
+    // Update avatar only if customAvatar === false
+    if (!existingByProvider.customAvatar && profile.avatar) {
+      updates.avatar = profile.avatar;
+    }
+
+    // Email sync: if provider says email changed and it's verified
+    let emailUpdated: { old: string; new: string } | undefined;
+    if (profile.emailVerified && profile.email !== existingByProvider.email) {
+      const emailTaken = await db.collection("users").findOne({
+        email: profile.email,
+        _id: { $ne: existingByProvider._id },
+      });
+      if (!emailTaken) {
+        updates.email = profile.email;
+        emailUpdated = { old: existingByProvider.email, new: profile.email };
+        logAudit({
+          teamId: existingByProvider.teamId,
+          actorId: existingByProvider._id,
+          action: "user.email_updated",
+          ip: "system",
+          plan: "free",
+          metadata: { old: existingByProvider.email, new: profile.email, provider: profile.provider },
+        }).catch(() => {});
+      }
+    }
+
+    // If deletion was requested, cancel it
+    if (existingByProvider.deletionRequestedAt) {
+      updates.deletionRequestedAt = null;
+      updates.deletedAt = null;
+      // Re-enable API keys
+      await db.collection("apiKeys").updateMany(
+        { userId: existingByProvider._id, disabled: true },
+        { $set: { disabled: false, disabledAt: null } },
+      );
+      logAudit({
+        teamId: existingByProvider.teamId,
+        actorId: existingByProvider._id,
+        action: "user.deletion_cancelled",
+        ip: "system",
+        plan: "free",
+        metadata: { reason: "login" },
+      }).catch(() => {});
+    }
+
+    await db.collection("users").updateOne({ _id: existingByProvider._id }, { $set: updates });
+    const updatedUser = { ...existingByProvider, ...updates } as User;
+    return { user: updatedUser, isNew: false, ...(emailUpdated ? { emailUpdated } : {}) };
+  }
+
+  // 2. Email not verified — reject
+  if (!profile.emailVerified) {
+    throw new Error("Email not verified by provider. Please verify your email and try again.");
+  }
+
+  // 3. Look up by email (auto-linking) — only non-deleted users
+  const existingByEmail = await db.collection("users").findOne({
+    email: profile.email,
+    deletedAt: { $exists: false },
+  }) as User | null;
+
+  if (existingByEmail) {
+    // Add provider to user's providers[]
+    const newProvider = {
+      provider: profile.provider,
+      providerId: profile.providerId,
+      email: profile.email,
+      verified: profile.emailVerified,
+      linkedAt: now,
+    };
+
+    const updates: Record<string, any> = {
+      lastLoginAt: now,
+      updatedAt: now,
+      $push: { providers: newProvider },
+    };
+
+    // Update avatar only if customAvatar === false
+    const avatarUpdate: Record<string, any> = { lastLoginAt: now, updatedAt: now };
+    if (!existingByEmail.customAvatar && profile.avatar) {
+      avatarUpdate.avatar = profile.avatar;
+    }
+
+    await db.collection("users").updateOne(
+      { _id: existingByEmail._id },
+      {
+        $set: avatarUpdate,
+        $push: { providers: newProvider } as any,
+      },
+    );
+
+    logAudit({
+      teamId: existingByEmail.teamId,
+      actorId: existingByEmail._id,
+      action: "provider.linked",
+      ip: "system",
+      plan: "free",
+      metadata: { provider: profile.provider, providerId: profile.providerId },
+    }).catch(() => {});
+
+    const updatedUser = {
+      ...existingByEmail,
+      ...avatarUpdate,
+      providers: [...existingByEmail.providers, newProvider],
+    } as User;
+    return { user: updatedUser, isNew: false };
+  }
+
+  // 4. New user creation
+  const newUserId = randomUUID();
+  let teamId: string;
+  let role: UserRole = "owner";
+  let platformRole: PlatformRole = "user";
+  let joined: { teamId: string; teamName: string } | undefined;
+  let inviteError: "expired" | "exhausted" | "not_found" | undefined;
+
+  // Try invite code
+  let inviteValid = false;
+  if (inviteCode) {
+    const inviteResult = await db.collection("teams").findOneAndUpdate(
+      {
+        "inviteCodes.code": inviteCode,
+        "inviteCodes.expiresAt": { $gt: now },
+        $expr: {
+          $lt: [
+            { $arrayElemAt: [{ $filter: { input: "$inviteCodes", as: "ic", cond: { $eq: ["$$ic.code", inviteCode] } } }, 0] },
+            { $arrayElemAt: [{ $map: { input: { $filter: { input: "$inviteCodes", as: "ic", cond: { $eq: ["$$ic.code", inviteCode] } } }, as: "ic", in: "$$ic.maxUses" } }, 0] },
+          ],
+        },
+      },
+      {
+        $inc: { "inviteCodes.$.uses": 1 },
+        $push: { "inviteCodes.$.usedBy": newUserId } as any,
+      },
+      { returnDocument: "after" },
+    );
+
+    if (inviteResult) {
+      const inviteEntry = (inviteResult as any).inviteCodes?.find((ic: any) => ic.code === inviteCode);
+      if (inviteEntry) {
+        teamId = (inviteResult as any)._id;
+        role = inviteEntry.role;
+        joined = { teamId, teamName: (inviteResult as any).name };
+        inviteValid = true;
+      }
+    } else {
+      // Determine reason
+      const code = await db.collection("teams").findOne({ "inviteCodes.code": inviteCode });
+      if (!code) {
+        inviteError = "not_found";
+      } else {
+        const entry = (code as any).inviteCodes?.find((ic: any) => ic.code === inviteCode);
+        if (entry && entry.expiresAt < now) {
+          inviteError = "expired";
+        } else {
+          inviteError = "exhausted";
+        }
+      }
+    }
+  }
+
+  if (!inviteValid) {
+    // Check first-user claim (atomic)
+    const platformConfigResult = await db.collection("platformConfig").findOneAndUpdate(
+      { _id: "config", firstUserClaimed: false },
+      { $set: { firstUserClaimed: true, claimedBy: newUserId } },
+      { upsert: false, returnDocument: "after" },
+    );
+
+    if (platformConfigResult) {
+      platformRole = "admin";
+    } else {
+      // Ensure platformConfig exists
+      await db.collection("platformConfig").updateOne(
+        { _id: "config" },
+        { $setOnInsert: { firstUserClaimed: false } },
+        { upsert: true },
+      );
+    }
+
+    // Create personal team
+    const newTeamId = randomUUID();
+    const teamName = `${profile.name}'s Team`;
+    const teamSlug = await generateUniqueSlug(profile.name);
+
+    await db.collection("teams").insertOne({
+      _id: newTeamId,
+      name: teamName,
+      slug: teamSlug,
+      plan: "free",
+      ownerId: newUserId,
+      watchlist: [],
+      inviteCodes: [],
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    teamId = newTeamId;
+    role = "owner";
+  }
+
+  // Create user
+  const newUser: User = {
+    _id: newUserId,
+    email: profile.email,
+    name: profile.name,
+    avatar: profile.avatar,
+    customAvatar: false,
+    role,
+    platformRole,
+    teamId: teamId!,
+    roleVersion: 0,
+    providers: [
+      {
+        provider: profile.provider,
+        providerId: profile.providerId,
+        email: profile.email,
+        verified: profile.emailVerified,
+        linkedAt: now,
+      },
+    ],
+    lastLoginAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await db.collection("users").insertOne(newUser);
+
+  // Create default NotificationPreferences
+  await db.collection("notificationPreferences").insertOne({
+    _id: newUserId,
+    loginAlerts: true,
+    teamInvites: true,
+    anomalyDigest: "daily",
+    updatedAt: now,
+  });
+
+  return { user: newUser, isNew: true, ...(joined ? { joined } : {}), ...(inviteError ? { inviteError } : {}) };
 }
