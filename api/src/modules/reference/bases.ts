@@ -19,8 +19,8 @@ basesRouter.get("/nearby", async (c) => {
   }
 
   const cacheKey = `gambit:bases:nearby:${lat},${lng},${radius}`;
-  const data = await cacheAside(cacheKey, async () => {
-    return getDb().collection("bases").find({
+  const result = await cacheAside(cacheKey, async () => {
+    const bases = await getDb().collection("bases").find({
       location: {
         $nearSphere: {
           $geometry: { type: "Point", coordinates: [lng, lat] },
@@ -28,9 +28,10 @@ basesRouter.get("/nearby", async (c) => {
         },
       },
     }).limit(50).toArray();
+    return { bases };
   }, CACHE_TTL);
 
-  return success(c, data);
+  return success(c, result.bases);
 });
 
 basesRouter.get("/:id", async (c) => {
