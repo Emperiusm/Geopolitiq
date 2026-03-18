@@ -124,6 +124,7 @@ export const graphConnections = signal<{
   edges: any[];
 } | null>(null);
 
+export const heatmapOpacity = signal(0.8);
 export const pluginManifests = signal<any[]>([]);
 export const userSettings = signal<UserSettings>({ aiEnabled: false });
 
@@ -184,17 +185,17 @@ export function toggleLayer(key: keyof LayerState) {
 }
 
 export function applyPreset(preset: LayerPreset) {
-  const base: LayerState = {
+  const base = {
     riskHeatmap: false, tradeRoutes: false, chokepoints: false,
     militaryBases: false, nsaZones: false, conflicts: false, elections: false,
-  };
-  layers.value = { ...base, ...LAYER_PRESETS[preset] };
+  } as LayerState;
+  layers.value = { ...base, ...LAYER_PRESETS[preset] } as LayerState;
 }
 
 export function selectCountry(country: Country | null) {
   selectedCountry.value = country;
   selectedEntity.value = country ? { type: 'country', id: country._id } : null;
-  rightPanelOpen.value = country !== null;
+  // Don't toggle rightPanelOpen — panel is always visible
 }
 
 export function addToCompare(country: Country) {

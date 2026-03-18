@@ -1,9 +1,6 @@
 import { h } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import {
-  sidebarOpen,
-  rightPanelOpen,
-  newsPanelOpen,
   bootstrapData,
   bootstrapLoading,
   latestEvents,
@@ -14,7 +11,6 @@ import { connectSSE, disconnectSSE } from './api/sse';
 import { DeckMap } from './map/deck-map';
 import { Sidebar } from './panels/sidebar';
 import { RightPanel } from './panels/right-panel';
-import { NewsFeed } from './panels/news-feed';
 import { TimelineScrubber } from './panels/timeline-scrubber';
 import { ComparePanel } from './panels/compare-panel';
 import { GraphExplorer } from './panels/graph-explorer';
@@ -51,14 +47,7 @@ export function App() {
     return () => disconnectSSE();
   }, []);
 
-  const layoutClass = [
-    'app-layout',
-    rightPanelOpen.value && newsPanelOpen.value
-      ? 'app-layout--news-open' 
-      : rightPanelOpen.value
-        ? 'app-layout--right-open'
-        : '',
-  ].filter(Boolean).join(' ');
+  const layoutClass = 'app-layout app-layout--right-open';
 
   if (bootstrapLoading.value) {
     return (
@@ -82,13 +71,11 @@ export function App() {
       </div>
 
       {/* Sidebar — left */}
-      {sidebarOpen.value && (
-        <aside class="sidebar panel-glass panel-border-right" style={{ zIndex: 'var(--z-sidebar)' }}>
-          <ErrorBoundary fallback={<div style={{padding: 16}}><Skeleton height="100%" /></div>}>
-            <Sidebar />
-          </ErrorBoundary>
-        </aside>
-      )}
+      <aside class="sidebar panel-glass panel-border-right" style={{ zIndex: 'var(--z-sidebar)' }}>
+        <ErrorBoundary fallback={<div style={{padding: 16}}><Skeleton height="100%" /></div>}>
+          <Sidebar />
+        </ErrorBoundary>
+      </aside>
 
       {/* Map viewport — center */}
       <div class="map-viewport" style={{ background: 'var(--bg-deep)', zIndex: 'var(--z-base)', position: 'relative' }}>
@@ -113,23 +100,12 @@ export function App() {
         </ErrorBoundary>
       )}
 
-      {/* Right panel — entity details */}
-      {rightPanelOpen.value && (
-        <aside class="right-panel panel-glass panel-border-left" style={{ zIndex: 'var(--z-panel)' }}>
-          <ErrorBoundary fallback={<div style={{padding: 16}}><Skeleton height="100%" /></div>}>
-            <RightPanel />
-          </ErrorBoundary>
-        </aside>
-      )}
-
-      {/* News panel */}
-      {newsPanelOpen.value && rightPanelOpen.value && (
-        <aside class="news-panel panel-glass panel-border-left" style={{ zIndex: 'var(--z-panel)' }}>
-          <ErrorBoundary fallback={<div style={{padding: 16}}><Skeleton height="100%" /></div>}>
-            <NewsFeed />
-          </ErrorBoundary>
-        </aside>
-      )}
+      {/* Right panel — entity details / events feed */}
+      <aside class="right-panel panel-glass panel-border-left" style={{ zIndex: 'var(--z-panel)' }}>
+        <ErrorBoundary fallback={<div style={{padding: 16}}><Skeleton height="100%" /></div>}>
+          <RightPanel />
+        </ErrorBoundary>
+      </aside>
 
       {/* Timeline — bottom */}
       <div class="timeline-bar panel-glass panel-border-top" style={{ zIndex: 'var(--z-timeline)' }}>

@@ -41,14 +41,6 @@ body {
     "timeline timeline timeline";
 }
 
-.app-layout--news-open {
-  grid-template-columns: var(--sidebar-width) 1fr var(--news-panel-width) var(--right-panel-width);
-  grid-template-areas:
-    "header  header  header  header"
-    "sidebar map   news   panel"
-    "timeline timeline timeline timeline";
-}
-
 /* --- Grid area assignments -------------------------------- */
 .app-header { grid-area: header; }
 .sidebar { grid-area: sidebar; }
