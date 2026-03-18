@@ -1,32 +1,62 @@
-# docker-compose.yml
+# docker-compose.yml — profiles: dev, staging, prod
+
 services:
-  api:
-    container_name: gambit-api
-    build: ./api
-    ports: ["3000:3000"]
-    environment:
-      MONGO_URI: mongodb://mongo:27017/gambit
-      REDIS_URL: redis://redis:6379  # internal Docker network — container port stays 6379
-      API_KEY: ${API_KEY:-dev}
-      PORT: "3000"
-      NODE_ENV: development
-      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
-    depends_on: [mongo, redis]
-    volumes:
-      - ./api/src:/app/src
-      - ./.firecrawl:/app/.firecrawl:ro
+  # ═══════════════════════════════════════════════════
+  # BASE SERVICES (always run)
+  # ═══════════════════════════════════════════════════
 
   mongo:
     container_name: gambit-mongo
     image: mongo:7
-    ports: ["27017:27017"]
+    restart: unless-stopped
+    ports: ["27017:27017"]      # Remove or bind to 127.0.0.1 in prod
     volumes:
       - mongo-data:/data/db
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     container_name: gambit-redis
     image: redis:7-alpine
-    ports: ["6380:6379"]
+    restart: unless-stopped
+    ports: ["6380:6379"]        # Remove or bind to 127.0.0.1 in prod
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ═══════════════════════════════════════════════════
+  # DEV PROFILE — tools for local development
+  # ═══════════════════════════════════════════════════
+
+  api-dev:
+    container_name: gambit-api-dev
+    build: ./api
+    ports: ["3000:3000"]
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/gambit
+      REDIS_URL: redis://redis:6379
+      PORT: "3000"
+      NODE_ENV: development
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      RATE_LIMIT_RPM: "1000"
+      NEWS_POLL_FAST_MS: "1800000"
+      NEWS_POLL_STANDARD_MS: "3600000"
+      NEWS_POLL_SLOW_MS: "14400000"
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - ./api/src:/app/src
+      - ./.firecrawl:/app/.firecrawl:ro
+    profiles: ["dev"]
 
   mongo-express:
     container_name: gambit-mongo-express
@@ -34,16 +64,109 @@ services:
     ports: ["8081:8081"]
     environment:
       ME_CONFIG_MONGODB_URL: mongodb://mongo:27017
+    depends_on:
+      mongo: { condition: service_healthy }
     profiles: ["dev"]
 
-  frontend:
-    container_name: gambit-frontend
-    build: ./frontend
-    ports: ["5173:5173"]
-    environment:
-      VITE_API_URL: http://localhost:3000/api/v1
-    depends_on: [api]
+  mailpit:
+    container_name: gambit-mailpit
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     profiles: ["dev"]
+
+  # ═══════════════════════════════════════════════════
+  # STAGING PROFILE — local production simulation
+  # ═══════════════════════════════════════════════════
+
+  api-staging:
+    container_name: gambit-api-staging
+    build:
+      context: ./api
+      dockerfile: Dockerfile.production
+    ports: ["3000:3000"]
+    environment:
+      MONGO_URI: mongodb://mongo:27017/gambit
+      REDIS_URL: redis://redis:6379
+      PORT: "3000"
+      NODE_ENV: production
+      CORS_ORIGINS: https://localhost
+      FRONTEND_URL: https://localhost
+      JWT_SECRET: ${JWT_SECRET:-staging-secret-change-for-production}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    profiles: ["staging"]
+
+  nginx-staging:
+    container_name: gambit-nginx-staging
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/staging.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/security-headers.conf:/etc/nginx/security_headers.conf:ro
+      - ./docker/certs:/etc/nginx/certs:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on: [api-staging]
+    profiles: ["staging"]
+
+  # ═══════════════════════════════════════════════════
+  # PROD PROFILE — actual production (on VPS)
+  # ═══════════════════════════════════════════════════
+
+  api-prod:
+    container_name: gambit-api
+    image: ghcr.io/${GITHUB_REPOSITORY:-your-org/gambit}/api:latest
+    restart: unless-stopped
+    ports: ["3000:3000"]
+    env_file: .env.production
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    profiles: ["prod"]
+
+  nginx-prod:
+    container_name: gambit-nginx
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/production.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/security-headers.conf:/etc/nginx/security_headers.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on: [api-prod]
+    profiles: ["prod"]
+
+  certbot:
+    container_name: gambit-certbot
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    profiles: ["prod"]
 
 volumes:
   mongo-data:
