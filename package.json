@@ -1,13 +1,23 @@
 {
-  "name": "geopolitiq",
+  "name": "gambit",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "docker compose up -d mongo redis && cd api && bun dev",
+    "dev:docker": "docker compose --profile dev up -d",
+    "dev:stop": "docker compose down",
+    "staging": "cd frontend && bun run build && cd .. && docker compose --profile staging up -d --build",
+    "staging:stop": "docker compose --profile staging down",
+    "seed": "cd api && bun src/seed/seed-all.ts",
+    "test": "cd api && bun test",
+    "test:watch": "cd api && bun test --watch",
+    "typecheck": "cd api && bun run typecheck",
+    "backup": "docker exec gambit-mongo mongodump --db=gambit --out=/backups/manual-$(date +%Y%m%d)",
+    "logs": "docker compose logs -f",
+    "logs:api": "docker compose logs -f api-dev || docker compose logs -f api-staging",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "preview": "vite preview"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.4",
