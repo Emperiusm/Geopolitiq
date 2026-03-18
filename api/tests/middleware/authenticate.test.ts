@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { Hono } from "hono";
+import type { AppVariables } from "../../src/types/auth";
 import { authenticate, PUBLIC_PATHS } from "../../src/middleware/authenticate";
 import { signAccessToken, hashToken } from "../../src/infrastructure/auth";
 import { connectMongo, disconnectMongo, getDb } from "../../src/infrastructure/mongo";
@@ -20,7 +21,7 @@ afterAll(async () => {
 });
 
 function createApp() {
-  const app = new Hono();
+  const app = new Hono<{ Variables: AppVariables }>();
   app.use("*", authenticate);
   app.get("/api/v1/health", (c) => c.json({ ok: true }));
   app.get("/api/v1/countries", (c) =>

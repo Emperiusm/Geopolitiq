@@ -1,11 +1,12 @@
 import { describe, it, expect } from "bun:test";
 import { Hono } from "hono";
+import type { AppVariables } from "../../src/types/auth";
 import { rateLimit } from "../../src/middleware/rate-limit";
 
 describe("Rate limit middleware", () => {
   it("allows requests under the rate limit (no auth = 100 RPM default)", async () => {
     const ip = `192.0.2.${Math.floor(Math.random() * 200)}`;
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", rateLimit);
     app.get("/test", (c) => c.json({ ok: true }));
 
@@ -17,7 +18,7 @@ describe("Rate limit middleware", () => {
   });
 
   it("uses role-based limits when auth context is set", async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", async (c, next) => {
       c.set("userId", "test-viewer");
       c.set("role", "viewer");
@@ -33,7 +34,7 @@ describe("Rate limit middleware", () => {
   });
 
   it("uses owner limit of 1000", async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", async (c, next) => {
       c.set("userId", "test-owner");
       c.set("role", "owner");
@@ -48,7 +49,7 @@ describe("Rate limit middleware", () => {
   });
 
   it("returns 429 with action field when rate limited", async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     // Set viewer role (50 RPM) and a unique userId
     const uid = `rate-limit-test-${Date.now()}`;
     app.use("*", async (c, next) => {

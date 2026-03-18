@@ -1,6 +1,6 @@
 import { getDb } from "./mongo";
 import { publishEvent } from "./sse";
-import type { TemporalSnapshot } from "../types";
+import type { TemporalSnapshot, SnapshotConflict, SnapshotChokepoint, SnapshotCountry, SnapshotNSA } from "../types";
 
 const COLLECTION = "snapshots";
 
@@ -19,16 +19,16 @@ export async function captureSnapshot(
   const [conflicts, chokepoints, countries, nsa] = await Promise.all([
     db.collection("conflicts")
       .find({}, { projection: { _id: 1, status: 1, dayCount: 1, casualties: 1 } })
-      .toArray(),
+      .toArray() as Promise<SnapshotConflict[]>,
     db.collection("chokepoints")
       .find({}, { projection: { _id: 1, status: 1 } })
-      .toArray(),
+      .toArray() as Promise<SnapshotChokepoint[]>,
     db.collection("countries")
       .find({}, { projection: { _id: 1, risk: 1, leader: 1, tags: 1 } })
-      .toArray(),
+      .toArray() as Promise<SnapshotCountry[]>,
     db.collection("nonStateActors")
       .find({}, { projection: { _id: 1, status: 1, zones: 1 } })
-      .toArray(),
+      .toArray() as Promise<SnapshotNSA[]>,
   ]);
 
   const snapshot: TemporalSnapshot = {

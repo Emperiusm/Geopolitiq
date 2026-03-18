@@ -8,9 +8,9 @@ import { getEmailService } from "../../infrastructure/email";
 import { hashToken, logAudit } from "../../infrastructure/auth";
 import { success, apiError, paginated } from "../../helpers/response";
 import { requirePlatformAdmin } from "../../middleware/require-platform-admin";
-import type { User, Team } from "../../types/auth";
+import type { User, Team, AppVariables } from "../../types/auth";
 
-export const adminRoutes = new Hono();
+export const adminRoutes = new Hono<{ Variables: AppVariables }>();
 
 // Apply platform admin middleware to all routes
 adminRoutes.use("*", requirePlatformAdmin());

@@ -3,6 +3,7 @@
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "bun:test";
 import { Hono } from "hono";
+import type { AppVariables } from "../../../src/types/auth";
 import { connectMongo, disconnectMongo, getDb } from "../../../src/infrastructure/mongo";
 import { notificationRoutes } from "../../../src/modules/system/notification-routes";
 import { randomUUID } from "crypto";
@@ -14,7 +15,7 @@ const USER_ID = randomUUID();
 const OTHER_USER_ID = randomUUID();
 
 function createApp(userId = USER_ID) {
-  const app = new Hono();
+  const app = new Hono<{ Variables: AppVariables }>();
 
   // Mock auth context
   app.use("*", async (c, next) => {

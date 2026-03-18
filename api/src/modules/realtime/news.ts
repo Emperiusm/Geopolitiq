@@ -4,8 +4,9 @@ import { getDb } from "../../infrastructure/mongo";
 import { cacheAside } from "../../infrastructure/cache";
 import { parseListParams, buildMongoFilter } from "../../helpers/query";
 import { paginated, success, apiError } from "../../helpers/response";
+import type { AppVariables } from "../../types/auth";
 
-export const newsRouter = new Hono();
+export const newsRouter = new Hono<{ Variables: AppVariables }>();
 
 newsRouter.get("/", async (c) => {
   const searchParams = new URL(c.req.url).searchParams;

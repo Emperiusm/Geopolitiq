@@ -103,7 +103,7 @@ graphRouter.get("/path", async (c) => {
             const path: GraphEdge[] = [];
             let cur: string | null = key;
             while (cur) {
-              const node = visited.get(cur)!;
+              const node: { via: string | null; edge: GraphEdge | null } = visited.get(cur)!;
               if (node.edge) path.unshift(node.edge);
               cur = node.via;
             }

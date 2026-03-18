@@ -8,6 +8,7 @@ import {
   hashToken,
 } from "../../src/infrastructure/auth";
 import { Hono } from "hono";
+import type { AppVariables } from "../../src/types/auth";
 import { authenticate } from "../../src/middleware/authenticate";
 import { requireRole } from "../../src/middleware/require-role";
 import { scopeCheck } from "../../src/middleware/scope-check";
@@ -160,7 +161,7 @@ describe("Auth Flow Integration", () => {
     });
 
     // Create a minimal Hono app with authenticate middleware
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", authenticate);
     app.get("/api/v1/protected", (c) => {
       return c.json({
@@ -189,7 +190,7 @@ describe("Auth Flow Integration", () => {
 
   it("5. API key auth works — create key, use it for GET (allowed) and POST (blocked for read scope)", async () => {
     // Build the app with authenticate + scopeCheck + apiKeyRoutes
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", authenticate);
     app.use("*", scopeCheck);
 
@@ -253,7 +254,7 @@ describe("Auth Flow Integration", () => {
 
   it("6. Team invite + join flow — user1 creates invite, user2 joins, gets new access token with correct role", async () => {
     // Build an app with authenticate + teamRoutes
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     app.use("*", authenticate);
     app.route("/api/v1/team", teamRoutes);
 
@@ -323,7 +324,7 @@ describe("Auth Flow Integration", () => {
 
     // The new access token should be valid and carry the new team context
     const newToken: string = joinBody.data.accessToken;
-    const app2 = new Hono();
+    const app2 = new Hono<{ Variables: AppVariables }>();
     app2.use("*", authenticate);
     app2.get("/api/v1/me", (c) =>
       c.json({

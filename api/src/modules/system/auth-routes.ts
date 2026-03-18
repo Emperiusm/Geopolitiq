@@ -17,7 +17,7 @@ import {
 import { getDb } from "../../infrastructure/mongo";
 import { getEmailService } from "../../infrastructure/email";
 import { success, apiError } from "../../helpers/response";
-import type { User, Session } from "../../types/auth";
+import type { User, Session, AppVariables } from "../../types/auth";
 
 // ---- Env helpers ----
 function getGitHubProvider() {
@@ -174,7 +174,7 @@ async function createSessionAndTokens(
 }
 
 // ---- Router ----
-export const authRoutes = new Hono();
+export const authRoutes = new Hono<{ Variables: AppVariables }>();
 
 // =====================================
 // OAuth: GitHub
@@ -187,7 +187,7 @@ authRoutes.get("/github", async (c) => {
   const inviteCode = new URL(c.req.url).searchParams.get("invite") ?? undefined;
   const recoveryToken = new URL(c.req.url).searchParams.get("recovery") ?? undefined;
 
-  const authUrl = await github.createAuthorizationURL(state, codeVerifier, ["user:email"]);
+  const authUrl = github.createAuthorizationURL(state, ["user:email"]);
 
   const cookieValue = JSON.stringify({ state, codeVerifier, inviteCode, recoveryToken });
   const cookieExpiry = new Date(Date.now() + 5 * 60 * 1000);
@@ -227,7 +227,7 @@ authRoutes.get("/github/callback", async (c) => {
 
   try {
     const github = getGitHubProvider();
-    const tokens = await github.validateAuthorizationCode(code, stateCookie.codeVerifier);
+    const tokens = await github.validateAuthorizationCode(code);
 
     // Fetch GitHub user profile
     const [profileRes, emailsRes] = await Promise.all([
@@ -960,7 +960,7 @@ authRoutes.get("/link/github", async (c) => {
   const state = randomBytes(16).toString("hex");
   const codeVerifier = randomBytes(32).toString("hex");
 
-  const authUrl = await github.createAuthorizationURL(state, codeVerifier, ["user:email"]);
+  const authUrl = github.createAuthorizationURL(state, ["user:email"]);
 
   const cookieValue = JSON.stringify({ state, codeVerifier, linkingUserId: userId });
   const cookieExpiry = new Date(Date.now() + 5 * 60 * 1000);
@@ -1000,7 +1000,7 @@ authRoutes.get("/link/github/callback", async (c) => {
 
   try {
     const github = getGitHubProvider();
-    const tokens = await github.validateAuthorizationCode(code, stateCookie.codeVerifier);
+    const tokens = await github.validateAuthorizationCode(code);
 
     const [profileRes, emailsRes] = await Promise.all([
       fetch("https://api.github.com/user", {

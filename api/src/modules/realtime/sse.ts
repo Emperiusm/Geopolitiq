@@ -4,8 +4,9 @@ import { streamSSE } from "hono/streaming";
 import { getRedis, isRedisConnected } from "../../infrastructure/redis";
 import { getBufferedEvents, getChannel } from "../../infrastructure/sse";
 import { verifyAccessToken } from "../../infrastructure/auth";
+import type { AppVariables } from "../../types/auth";
 
-export const sseRouter = new Hono();
+export const sseRouter = new Hono<{ Variables: AppVariables }>();
 
 sseRouter.get("/stream", async (c) => {
   const token = c.req.query("token");

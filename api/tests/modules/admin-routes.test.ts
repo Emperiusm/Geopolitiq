@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { Hono } from "hono";
+import type { AppVariables } from "../../src/types/auth";
 import { connectMongo, disconnectMongo, getDb } from "../../src/infrastructure/mongo";
 import { signAccessToken, hashToken } from "../../src/infrastructure/auth";
 import { adminRoutes } from "../../src/modules/system/admin-routes";
@@ -8,7 +9,7 @@ import { randomUUID } from "crypto";
 const BASE_URL = "http://localhost";
 
 function createApp() {
-  const app = new Hono();
+  const app = new Hono<{ Variables: AppVariables }>();
 
   // Add platform admin middleware
   app.use("/*", async (c, next) => {
@@ -587,8 +588,8 @@ describe("Admin Routes", () => {
       // Verify recovery token was created
       const recoveryToken = await db.collection("recoveryTokens").findOne({ userId });
       expect(recoveryToken).toBeDefined();
-      expect(recoveryToken.expiresAt).toBeDefined();
-      expect(recoveryToken.hash).toBeDefined();
+      expect(recoveryToken!.expiresAt).toBeDefined();
+      expect(recoveryToken!.hash).toBeDefined();
 
       // Verify audit log was created
       const auditLog = await db.collection("auditEvents").findOne({

@@ -149,7 +149,7 @@ binaryLayersRouter.get("/:layer/binary", async (c) => {
       3600,
     );
 
-    return new Response(buf, {
+    return new Response(new Uint8Array(buf), {
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Length": String(buf.byteLength),
@@ -164,7 +164,7 @@ binaryLayersRouter.get("/:layer/binary", async (c) => {
     3600,
   );
 
-  return new Response(buf, {
+  return new Response(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/octet-stream",
       "Content-Length": String(buf.byteLength),

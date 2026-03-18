@@ -4,8 +4,9 @@
 import { Hono } from "hono";
 import { getDb } from "../../infrastructure/mongo";
 import { success, validationError } from "../../helpers/response";
+import type { AppVariables } from "../../types/auth";
 
-export const notificationRoutes = new Hono();
+export const notificationRoutes = new Hono<{ Variables: AppVariables }>();
 
 const DEFAULTS = {
   loginAlerts: true,

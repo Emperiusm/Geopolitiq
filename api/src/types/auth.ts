@@ -232,6 +232,23 @@ export interface AuthContext {
   realActorId?: string;
 }
 
+// --- Hono Variables (used as generic for Hono<{ Variables: AppVariables }>) ---
+
+export interface AppVariables {
+  userId: string;
+  teamId: string;
+  role: UserRole;
+  platformRole: PlatformRole;
+  authMethod: AuthMethod;
+  scope: ApiKeyScope;
+  roleVersion: number;
+  apiKeyMeta: { id: string; name: string; prefix: string };
+  realActorId: string;
+  logUserId: string;
+  logTeamId: string;
+  logAuthMethod: string;
+}
+
 // --- OAuth Types ---
 
 export interface OAuthProfile {

@@ -13,7 +13,7 @@ export async function cacheAside<T>(
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
           Object.defineProperty(parsed, "_cached", { value: true, enumerable: false });
-          return parsed;
+          return parsed as any;
         }
         return { ...parsed, _cached: true };
       }
@@ -33,7 +33,7 @@ export async function cacheAside<T>(
     }
   }
 
-  return data;
+  return data as T & { _cached?: boolean };
 }
 
 export async function invalidateCache(pattern: string): Promise<number> {

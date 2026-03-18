@@ -9,8 +9,9 @@ import {
 import { success, apiError, validationError } from "../../helpers/response";
 import { requireRole } from "../../middleware/require-role";
 import type { LLMProvider } from "../../types";
+import type { AppVariables } from "../../types/auth";
 
-export const settingsRoutes = new Hono();
+export const settingsRoutes = new Hono<{ Variables: AppVariables }>();
 
 settingsRoutes.put("/ai", requireRole("member"), async (c) => {
   const userId = c.get("userId") as string;

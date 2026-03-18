@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "bun:test";
 import { Hono } from "hono";
+import type { AppVariables } from "../../src/types/auth";
 import { connectMongo, disconnectMongo, getDb } from "../../src/infrastructure/mongo";
 import { hashToken } from "../../src/infrastructure/auth";
 import { apiKeyRoutes } from "../../src/modules/system/api-key-routes";
@@ -12,7 +13,7 @@ const TEST_TEAM_ID = randomUUID();
 const TEST_ROLE = "member";
 
 function createApp() {
-  const app = new Hono();
+  const app = new Hono<{ Variables: AppVariables }>();
 
   // Mock auth context middleware — sets userId, teamId, role via c.set
   app.use("*", async (c, next) => {

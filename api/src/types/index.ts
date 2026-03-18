@@ -337,6 +337,7 @@ export interface NewsAnalysis {
   provider: LLMProvider;
   model: string;
   userId: string;
+  teamId?: string;
   analyzedAt: Date;
 }
 
@@ -447,6 +448,8 @@ export interface ApiMeta {
   offset?: number;
   cached?: boolean;
   freshness?: string;
+  bbox?: number[];
+  message?: string;
 }
 
 export interface ApiSuccess<T> {

@@ -3,6 +3,7 @@
 
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "bun:test";
 import { Hono } from "hono";
+import type { AppVariables } from "../../../src/types/auth";
 import { connectMongo, disconnectMongo, getDb } from "../../../src/infrastructure/mongo";
 import { teamRoutes } from "../../../src/modules/system/team-routes";
 import { randomUUID } from "crypto";
@@ -23,7 +24,7 @@ function createApp(
   role: Role = "owner",
   teamId = TEAM_ID,
 ) {
-  const app = new Hono();
+  const app = new Hono<{ Variables: AppVariables }>();
 
   // Mock auth context
   app.use("*", async (c, next) => {

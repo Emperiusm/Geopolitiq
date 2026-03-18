@@ -52,8 +52,9 @@ import { teamSettingsRoutes } from "./modules/system/team-settings-routes";
 import { notificationRoutes } from "./modules/system/notification-routes";
 import { adminRoutes } from "./modules/system/admin-routes";
 import { startAccountCleanup } from "./modules/periodic/account-cleanup";
+import type { AppVariables } from "./types/auth";
 
-const app = new Hono();
+const app = new Hono<{ Variables: AppVariables }>();
 
 // Global middleware (order matters)
 // 1. CORS
@@ -95,7 +96,7 @@ app.use("/api/*", scopeCheck);
 app.use("/api/*", cacheHeaders);
 
 // Mount routes
-const api = new Hono();
+const api = new Hono<{ Variables: AppVariables }>();
 api.route("/health", healthRoutes);
 
 // Auth routes
@@ -140,7 +141,7 @@ api.route("/anomalies", anomaliesRouter);
 api.route("/layers", binaryLayersRouter);
 
 // Platform admin only routes
-const adminOnly = new Hono();
+const adminOnly = new Hono<{ Variables: AppVariables }>();
 adminOnly.use("*", requirePlatformAdmin());
 adminOnly.route("/seed", seedRoutes);
 adminOnly.route("/plugins", pluginRoutes);

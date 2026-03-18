@@ -6,9 +6,9 @@ import { randomBytes, randomUUID } from "crypto";
 import { getDb } from "../../infrastructure/mongo";
 import { hashToken, logAudit } from "../../infrastructure/auth";
 import { success, apiError, validationError } from "../../helpers/response";
-import type { ApiKeyScope } from "../../types/auth";
+import type { ApiKeyScope, AppVariables } from "../../types/auth";
 
-export const apiKeyRoutes = new Hono();
+export const apiKeyRoutes = new Hono<{ Variables: AppVariables }>();
 
 const VALID_SCOPES: ApiKeyScope[] = ["read", "read-write"];
 

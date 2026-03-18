@@ -14,9 +14,9 @@ import {
 import { getRedis, isRedisConnected } from "../../infrastructure/redis";
 import { success, apiError, validationError } from "../../helpers/response";
 import { requireRole } from "../../middleware/require-role";
-import type { UserRole } from "../../types/auth";
+import type { UserRole, AppVariables } from "../../types/auth";
 
-export const teamRoutes = new Hono();
+export const teamRoutes = new Hono<{ Variables: AppVariables }>();
 
 // ---- Helpers ----
 

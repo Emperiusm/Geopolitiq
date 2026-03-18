@@ -11,8 +11,9 @@ import {
 import { success, validationError } from "../../helpers/response";
 import { requireRole } from "../../middleware/require-role";
 import type { LLMProvider } from "../../types";
+import type { AppVariables } from "../../types/auth";
 
-export const teamSettingsRoutes = new Hono();
+export const teamSettingsRoutes = new Hono<{ Variables: AppVariables }>();
 
 // GET /ai — get team AI config (member+)
 teamSettingsRoutes.get(
