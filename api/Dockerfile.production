@@ -1,0 +1,15 @@
+FROM oven/bun:1-alpine AS runtime
+WORKDIR /app
+RUN addgroup -S gambit && adduser -S gambit -G gambit
+COPY package.json bun.lock* ./
+RUN bun install --frozen-lockfile --production 2>/dev/null || bun install --production
+COPY src/ ./src/
+
+RUN mkdir -p /app/plugins && chown gambit:gambit /app/plugins
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/v1/health || exit 1
+
+USER gambit
+EXPOSE 3000
+CMD ["bun", "src/index.ts"]
