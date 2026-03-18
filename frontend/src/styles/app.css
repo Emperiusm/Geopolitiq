@@ -1,0 +1,155 @@
+/* ============================================================
+   GAMBIT — Root Layout Styles
+   ============================================================ */
+@import './variables.css';
+
+/* --- Reset & base ----------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Mono class for data values --------------------------- */
+.mono { font-family: var(--font-mono); }
+
+/* --- App layout ------------------------------------------- */
+.app-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: var(--alert-height) 1fr var(--timeline-height);
+  grid-template-areas:
+    "alert  alert"
+    "sidebar map"
+    "timeline timeline";
+  height: 100vh;
+  width: 100vw;
+}
+
+.app-layout--right-open {
+  grid-template-columns: var(--sidebar-width) 1fr var(--right-panel-width);
+  grid-template-areas:
+    "alert  alert  alert"
+    "sidebar map   panel"
+    "timeline timeline timeline";
+}
+
+.app-layout--news-open {
+  grid-template-columns: var(--sidebar-width) 1fr var(--news-panel-width) var(--right-panel-width);
+  grid-template-areas:
+    "alert  alert  alert  alert"
+    "sidebar map   news   panel"
+    "timeline timeline timeline timeline";
+}
+
+/* --- Grid area assignments -------------------------------- */
+.alert-banner { grid-area: alert; }
+.sidebar { grid-area: sidebar; }
+.map-viewport { grid-area: map; position: relative; overflow: hidden; }
+.right-panel { grid-area: panel; }
+.news-panel { grid-area: news; }
+.timeline-bar { grid-area: timeline; }
+
+/* --- Panel base styles ------------------------------------ */
+.panel-glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+  box-shadow: var(--glass-shadow);
+}
+
+.panel-border-left { border-left: 1px solid var(--border-subtle); }
+.panel-border-right { border-right: 1px solid var(--border-subtle); }
+.panel-border-top { border-top: 1px solid var(--border-subtle); }
+.panel-border-bottom { border-bottom: 1px solid var(--border-subtle); }
+
+/* --- Scrollbar -------------------------------------------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+/* --- Utility classes -------------------------------------- */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+.badge--danger { background: var(--danger-dim); color: var(--danger); }
+.badge--warning { background: var(--warning-dim); color: var(--warning); }
+.badge--success { background: var(--success-dim); color: var(--success); }
+.badge--info { background: var(--info-dim); color: var(--info); }
+.badge--accent { background: var(--accent-blue-dim); color: var(--accent-blue); }
+
+/* --- Risk badges ------------------------------------------ */
+.risk-catastrophic { background: var(--risk-catastrophic-bg); color: var(--risk-catastrophic); }
+.risk-extreme { background: var(--risk-extreme-bg); color: var(--risk-extreme); }
+.risk-severe { background: var(--risk-severe-bg); color: var(--risk-severe); }
+.risk-stormy { background: var(--risk-stormy-bg); color: var(--risk-stormy); }
+.risk-cloudy { background: var(--risk-cloudy-bg); color: var(--risk-cloudy); }
+.risk-clear { background: var(--risk-clear-bg); color: var(--risk-clear); }
+
+/* --- Toggle switch ---------------------------------------- */
+.toggle {
+  width: 28px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  position: relative;
+  background: var(--border-medium);
+  cursor: pointer;
+  transition: background var(--duration-normal) var(--ease-default);
+}
+.toggle--on { background: var(--accent-blue); }
+.toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--duration-normal) var(--ease-default);
+}
+.toggle--on .toggle__thumb { transform: translateX(12px); }
+
+/* --- Animations ------------------------------------------- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.8); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+}
+
+@keyframes slide-in-top {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-pulse { animation: pulse 2.5s ease-in-out infinite; }
+.animate-slide-in-top { animation: slide-in-top var(--duration-slow) var(--ease-default); }
+.animate-fade-in { animation: fade-in var(--duration-slow) var(--ease-default); }

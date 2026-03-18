@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GAMBIT — Geopolitical Intelligence</title>
+  <meta name="description" content="Real-time geopolitical intelligence platform" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* Critical inline CSS — prevents FOUC */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+    html[data-theme="dark"] body { background: #08080d; color: #e8eaf0; }
+    html[data-theme="light"] body { background: #f4f6fa; color: #1a1e2e; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-size: 13px; line-height: 1.5; }
+    #root { display: flex; }
+    /* Loading state */
+    .app-loading { display: flex; align-items: center; justify-content: center; height: 100vh; width: 100vw; }
+    .app-loading-text { font-family: 'JetBrains Mono', monospace; font-size: 14px; letter-spacing: 3px; opacity: 0.5; }
+    html[data-theme="dark"] .app-loading-text { color: #00b4ff; }
+    html[data-theme="light"] .app-loading-text { color: #0082d4; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div class="app-loading">
+      <span class="app-loading-text">GAMBIT</span>
+    </div>
+  </div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

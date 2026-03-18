@@ -1,0 +1,233 @@
+/* ============================================================
+   GAMBIT Design System — Dual Theme Tokens
+   
+   Sources:
+   - Dark: Existing Geopolitiq app + glass-morphism modernization
+   - Light: Stitch-generated light mode (Inter + JetBrains Mono)
+   
+   Usage: <html data-theme="dark"> or <html data-theme="light">
+   Default: dark
+   ============================================================ */
+
+:root {
+  /* --- Fonts ---------------------------------------------- */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+
+  /* --- Type scale ----------------------------------------- */
+  --text-2xs: 0.625rem;   /* 10px — badges, labels */
+  --text-xs: 0.6875rem;   /* 11px — meta, timestamps */
+  --text-sm: 0.75rem;     /* 12px — body small, sidebar items */
+  --text-base: 0.8125rem; /* 13px — default body */
+  --text-md: 0.875rem;    /* 14px — panel headers */
+  --text-lg: 1rem;        /* 16px — entity names */
+  --text-xl: 1.125rem;    /* 18px — modal titles */
+  --text-2xl: 1.5rem;     /* 24px — stat values */
+
+  /* --- Spacing -------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 40px;
+
+  /* --- Radii ---------------------------------------------- */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* --- Transitions ---------------------------------------- */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* --- Z-index scale -------------------------------------- */
+  --z-base: 0;
+  --z-map-controls: 10;
+  --z-presets: 15;
+  --z-sidebar: 20;
+  --z-panel: 20;
+  --z-timeline: 25;
+  --z-alert: 30;
+  --z-search: 35;
+  --z-tooltip: 40;
+  --z-modal: 100;
+
+  /* --- Layout --------------------------------------------- */
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 52px;
+  --right-panel-width: 360px;
+  --news-panel-width: 280px;
+  --timeline-height: 60px;
+  --alert-height: 36px;
+
+  /* --- Risk colors (shared across themes) ----------------- */
+  --risk-catastrophic: #ff2040;
+  --risk-extreme: #ff6030;
+  --risk-severe: #ff9020;
+  --risk-stormy: #ffb840;
+  --risk-cloudy: #88a0c0;
+  --risk-clear: #40d890;
+
+  /* --- Category colors (shared) --------------------------- */
+  --cat-conflict: #3b82f6;
+  --cat-security: #a855f7;
+  --cat-economic: #14b8a6;
+  --cat-cyber: #06b6d4;
+  --cat-maritime: #0ea5e9;
+  --cat-political: #10b981;
+  --cat-diplomacy: #14b8a6;
+}
+
+/* ============================================================
+   DARK THEME (default)
+   From: existing Geopolitiq #06060e/#111118 + glass-morphism
+   ============================================================ */
+[data-theme="dark"] {
+  /* --- Backgrounds ---------------------------------------- */
+  --bg-deep: #08080d;
+  --bg-base: #0c0c14;
+  --bg-surface: #111118;
+  --bg-elevated: #1a1a28;
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-active: rgba(255, 255, 255, 0.06);
+  --bg-input: rgba(255, 255, 255, 0.04);
+
+  /* Glass-morphism */
+  --bg-glass: rgba(16, 16, 28, 0.72);
+  --bg-glass-hover: rgba(22, 22, 38, 0.82);
+  --glass-blur: 16px;
+  --glass-blur-heavy: 24px;
+  --glass-shadow: none;
+
+  /* --- Borders -------------------------------------------- */
+  --border-subtle: rgba(100, 120, 180, 0.12);
+  --border-medium: rgba(100, 120, 180, 0.20);
+  --border-strong: rgba(100, 120, 180, 0.30);
+  --border-accent: rgba(0, 180, 255, 0.25);
+
+  /* --- Text ----------------------------------------------- */
+  --text-primary: #e8eaf0;
+  --text-secondary: #8a8ea8;
+  --text-tertiary: #575b72;
+  --text-inverse: #08080d;
+
+  /* --- Accents -------------------------------------------- */
+  --accent-blue: #00b4ff;
+  --accent-cyan: #00e5cc;
+  --accent-blue-dim: rgba(0, 180, 255, 0.15);
+  --accent-cyan-dim: rgba(0, 229, 204, 0.10);
+
+  /* --- Semantic colors ------------------------------------- */
+  --warning: #ffb020;
+  --warning-dim: rgba(255, 176, 32, 0.12);
+  --danger: #ff4058;
+  --danger-dim: rgba(255, 64, 88, 0.12);
+  --success: #00d68f;
+  --success-dim: rgba(0, 214, 143, 0.10);
+  --info: #3b82f6;
+  --info-dim: rgba(59, 130, 246, 0.12);
+
+  /* --- Risk badge backgrounds ------------------------------ */
+  --risk-catastrophic-bg: rgba(255, 32, 64, 0.15);
+  --risk-extreme-bg: rgba(255, 96, 48, 0.15);
+  --risk-severe-bg: rgba(255, 144, 32, 0.12);
+  --risk-stormy-bg: rgba(255, 184, 64, 0.10);
+  --risk-cloudy-bg: rgba(136, 160, 192, 0.10);
+  --risk-clear-bg: rgba(64, 216, 144, 0.10);
+
+  /* --- Globe-specific -------------------------------------- */
+  --globe-bg: radial-gradient(ellipse 80% 80% at 50% 55%, #0d1528, #080810 60%, #050508);
+  --globe-atmosphere: rgba(0, 136, 255, 0.06);
+
+  /* --- Scrollbar ------------------------------------------- */
+  --scrollbar-track: #0a0a12;
+  --scrollbar-thumb: #1a1a2e;
+  --scrollbar-thumb-hover: #2a2a3e;
+}
+
+/* ============================================================
+   LIGHT THEME
+   From: Stitch output — Inter + cool grays + shadows
+   ============================================================ */
+[data-theme="light"] {
+  /* --- Backgrounds ---------------------------------------- */
+  --bg-deep: #f4f6fa;
+  --bg-base: #f8f9fc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.03);
+  --bg-active: rgba(0, 0, 0, 0.05);
+  --bg-input: rgba(0, 0, 0, 0.03);
+
+  /* Glass-morphism → soft shadows in light */
+  --bg-glass: rgba(255, 255, 255, 0.82);
+  --bg-glass-hover: rgba(255, 255, 255, 0.92);
+  --glass-blur: 16px;
+  --glass-blur-heavy: 24px;
+  --glass-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 4px rgba(0, 0, 0, 0.03);
+
+  /* --- Borders -------------------------------------------- */
+  --border-subtle: rgba(0, 20, 60, 0.08);
+  --border-medium: rgba(0, 20, 60, 0.14);
+  --border-strong: rgba(0, 20, 60, 0.20);
+  --border-accent: rgba(0, 130, 210, 0.25);
+
+  /* --- Text ----------------------------------------------- */
+  --text-primary: #1a1e2e;
+  --text-secondary: #5a6078;
+  --text-tertiary: #8a90a8;
+  --text-inverse: #ffffff;
+
+  /* --- Accents (darkened for contrast on light) ------------ */
+  --accent-blue: #0082d4;
+  --accent-cyan: #0099aa;
+  --accent-blue-dim: rgba(0, 130, 212, 0.08);
+  --accent-cyan-dim: rgba(0, 153, 170, 0.07);
+
+  /* --- Semantic colors ------------------------------------- */
+  --warning: #c07800;
+  --warning-dim: rgba(192, 120, 0, 0.08);
+  --danger: #d03040;
+  --danger-dim: rgba(208, 48, 64, 0.07);
+  --success: #008860;
+  --success-dim: rgba(0, 136, 96, 0.07);
+  --info: #2563eb;
+  --info-dim: rgba(37, 99, 235, 0.08);
+
+  /* --- Risk badge backgrounds ------------------------------ */
+  --risk-catastrophic-bg: rgba(208, 48, 64, 0.08);
+  --risk-extreme-bg: rgba(216, 80, 32, 0.08);
+  --risk-severe-bg: rgba(192, 120, 0, 0.08);
+  --risk-stormy-bg: rgba(184, 144, 32, 0.06);
+  --risk-cloudy-bg: rgba(96, 120, 152, 0.08);
+  --risk-clear-bg: rgba(32, 136, 96, 0.06);
+
+  /* --- Light-mode risk text colors (darkened for contrast) - */
+  --risk-catastrophic: #d02030;
+  --risk-extreme: #d85020;
+  --risk-severe: #c07800;
+  --risk-stormy: #b89020;
+  --risk-cloudy: #607898;
+  --risk-clear: #208860;
+
+  /* --- Globe-specific -------------------------------------- */
+  --globe-bg: radial-gradient(ellipse 80% 80% at 50% 55%, #dce4f0, #c8d4e8 40%, #b8c8e0 70%, #e0e6f0);
+  --globe-atmosphere: rgba(0, 80, 180, 0.08);
+
+  /* --- Scrollbar ------------------------------------------- */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
