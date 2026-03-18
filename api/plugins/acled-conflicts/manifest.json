@@ -1,0 +1,35 @@
+{
+  "id": "acled-conflicts",
+  "name": "ACLED Armed Conflict Events",
+  "version": "1.0.0",
+  "type": "source",
+  "collection": "acled",
+  "pollInterval": 3600000,
+  "binaryLayer": {
+    "stride": 6,
+    "fields": ["lng", "lat", "eventType", "fatalities", "interactionType", "timestamp"]
+  },
+  "entityLinks": {
+    "countryField": "countryISO",
+    "locationField": "location"
+  },
+  "deckglLayer": {
+    "type": "ScatterplotLayer",
+    "colorMap": {
+      "Battles": "#E24B4A",
+      "Explosions/Remote violence": "#D85A30",
+      "Violence against civilians": "#D4537E",
+      "Protests": "#EF9F27",
+      "Riots": "#BA7517",
+      "Strategic developments": "#378ADD"
+    },
+    "radiusField": "fatalities",
+    "radiusScale": 3000
+  },
+  "panel": {
+    "icon": "crosshairs",
+    "group": "SECURITY",
+    "sortField": "fatalities",
+    "sortDirection": "desc"
+  }
+}

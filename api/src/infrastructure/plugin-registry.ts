@@ -99,22 +99,44 @@ async function setupSourcePlugin(plugin: RegisteredPlugin): Promise<void> {
 
         // Generate graph edges
         if (manifest.entityLinks?.countryField) {
+          // Build iso2 → slug lookup so plugins can provide ISO2 codes
+          const countries = await db.collection("countries")
+            .find({}, { projection: { _id: 1, iso2: 1 } })
+            .toArray();
+          const iso2ToSlug = new Map<string, string>();
+          const slugSet = new Set<string>();
+          for (const c of countries) {
+            slugSet.add(c._id as string);
+            if (c.iso2) iso2ToSlug.set((c.iso2 as string).toUpperCase(), c._id as string);
+          }
+
           const edges: GraphEdge[] = [];
+          const docIds: string[] = [];
           const now = new Date();
           for (const doc of docs) {
             const countryVal = doc[manifest.entityLinks.countryField!];
-            if (countryVal) {
-              edges.push({
-                from: { type: "news", id: String(doc._id) },
-                to: { type: "country", id: countryVal },
-                relation: "mentions",
-                weight: 0.8,
-                source: "nlp",
-                createdAt: now,
-              });
-            }
+            docIds.push(String(doc._id));
+            if (!countryVal) continue;
+            // Resolve: try as iso2 first, then as slug directly
+            const resolved = iso2ToSlug.get(String(countryVal).toUpperCase())
+              ?? (slugSet.has(countryVal) ? countryVal : null);
+            if (!resolved) continue;
+            edges.push({
+              from: { type: "news", id: String(doc._id) },
+              to: { type: "country", id: resolved },
+              relation: "mentions",
+              weight: 0.8,
+              source: "nlp",
+              createdAt: now,
+            });
           }
           if (edges.length > 0) {
+            // Remove stale edges for these docs before reinserting
+            await db.collection("edges").deleteMany({
+              "from.id": { $in: docIds },
+              relation: "mentions",
+              source: "nlp",
+            }).catch(() => {});
             await db.collection("edges").insertMany(edges).catch(() => {});
           }
         }

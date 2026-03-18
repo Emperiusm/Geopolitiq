@@ -40,14 +40,37 @@ Geopolitiq/
       modules/
         reference/                  # countries, bases, nsa, chokepoints, elections, trade-routes, ports, conflicts
         realtime/                   # news, SSE event stream
+        aggregate/
+          timeline.ts               # GET /timeline/at, /timeline/range
+          graph.ts                  # GET /graph/connections, /graph/path
+          anomalies.ts              # GET /anomalies, /anomalies/baseline/:type/:id
         periodic/                   # scheduled fetchers (see Section 4.14)
+          news-aggregator.ts        # Tiered RSS poller + dedup + enrich pipeline
+          anomaly-cleanup.ts        # Prune Redis counter hashes older than 7 days
+        system/
+          settings-routes.ts        # PUT/GET/DELETE /settings/ai
+          plugin-routes.ts          # GET /plugins/manifest, /plugins/:id/status
         compute/                    # future: correlation, ML, forecasting (see Section 4.15)
       infrastructure/
         mongo.ts                    # MongoDB client + connection pool
         redis.ts                    # Redis client + pub/sub
         cache.ts                    # Cache-aside (Redis -> Mongo fallback)
+        binary-cache.ts             # Buffer-native Redis cache for binary layers
         sse.ts                       # SSE stream manager (connection pool, pub/sub bridge)
         health.ts                   # Health check endpoint (readiness + liveness)
+        snapshots.ts                # Temporal snapshot capture + retrieval
+        entity-dictionary.ts        # Dictionary-based NER from Mongo collections
+        enrichment.ts               # enrichNewsItem() — entity linking pipeline
+        graph.ts                    # Graph edge builder + query helpers
+        feed-registry.ts            # 220+ RSS feeds with tier/category metadata
+        rss-parser.ts               # Zero-dep regex RSS/Atom XML parser
+        plugin-registry.ts          # Plugin discovery, validation, auto-wiring
+        anomaly-detector.ts         # Z-score spike detection on Redis counters
+        user-settings.ts            # Encrypted BYOK API key storage (AES-256-GCM)
+        ai-analysis.ts              # Tier 2 LLM analysis (Anthropic + OpenAI)
+        provenance.ts               # Source provenance scoring + trust assessment
+        citation-extractor.ts       # Citation chain extraction from article text
+        source-tiers.ts             # Static trust tier registry per feed domain
       middleware/
         cors.ts
         rate-limit.ts
@@ -137,6 +160,18 @@ volumes:
 | `SSE_BUFFER_SIZE` | api | No | `100` | Max events buffered for reconnect replay |
 | `PMTILES_PATH` | api | No | `./data/tiles.pmtiles` | Path to PMTiles file for static serving |
 | `VITE_API_URL` | frontend | Yes | `http://localhost:3000/api/v1` | API base URL |
+| `NEWS_POLL_FAST_MS` | api | No | `900000` | Fast-tier RSS poll interval (15 min) |
+| `NEWS_POLL_STANDARD_MS` | api | No | `3600000` | Standard-tier RSS poll interval (1 hr) |
+| `NEWS_POLL_SLOW_MS` | api | No | `14400000` | Slow-tier RSS poll interval (4 hr) |
+| `NEWS_BATCH_CONCURRENCY` | api | No | `15` | Max concurrent RSS feed fetches per batch |
+| `NEWS_FEED_TIMEOUT_MS` | api | No | `8000` | Per-feed fetch timeout |
+| `NEWS_OVERALL_DEADLINE_MS` | api | No | `25000` | Overall deadline per poll batch |
+| `SETTINGS_ENCRYPTION_KEY` | api | Yes (prod) | — | 32-byte hex string for AES-256-GCM user settings encryption |
+| `AI_MAX_CLUSTERS_PER_CYCLE` | api | No | `10` | Max event clusters analyzed per AI cycle |
+| `ANOMALY_THRESHOLD_WATCH` | api | No | `2` | Z-score threshold for watch severity |
+| `ANOMALY_THRESHOLD_ALERT` | api | No | `3` | Z-score threshold for alert severity |
+| `ANOMALY_THRESHOLD_CRITICAL` | api | No | `4` | Z-score threshold for critical severity |
+| `ANOMALY_BASELINE_HOURS` | api | No | `168` | Sliding window size for anomaly baselines (7 days) |
 
 ### 2.4 CORS Configuration
 
@@ -155,7 +190,7 @@ All collections include shared metadata fields:
 {
   createdAt: Date,
   updatedAt: Date,
-  dataSource: string    // "hegemon-bundle" | "firecrawl-scrape" | "manual"
+  dataSource: string    // "hegemon-bundle" | "firecrawl-scrape" | "manual" | "rss-feed"
 }
 ```
 
@@ -397,6 +432,18 @@ All collections include shared metadata fields:
   sourceCount: 8,
   conflictId: "us-iran-war",
   relatedCountries: ["US", "IR"],      // ISO-2 codes, join via countries.iso2
+  relatedChokepoints: ["hormuz"],      // chokepoint _id references (NLP enrichment)
+  relatedNSA: ["hezbollah"],           // NSA _id references (NLP enrichment)
+  sources: ["Reuters", "AP"],          // source names for dedup
+  enrichedAt: Date | null,             // timestamp of NLP enrichment pass
+  provenance: {                        // source provenance scoring (see Section 5.8)
+    trustScore: number,                // 0-1 composite trust score
+    sourceTier: string,                // primary|established|specialized|regional|aggregator|unknown
+    citations: Array<{ type: string, source: string, confidence: number }>,
+    corroborationCount: number,
+    isFirstMover: boolean,
+    redFlags: string[],
+  } | null,
   publishedAt: ISODate("2026-03-16T20:00:00Z"),
   createdAt: Date,
   updatedAt: Date,
@@ -416,6 +463,107 @@ All collections include shared metadata fields:
 ```
 
 Used by Military and Compare overlays to assign consistent colors per country.
+
+### 3.11 `snapshots` (temporal state)
+
+One document per snapshot. Captures only mutable fields from 4 collections. ~80KB per snapshot.
+
+```ts
+{
+  _id: ObjectId,
+  timestamp: Date,
+  trigger: "scheduled" | "event",
+  triggerDetail?: string,           // e.g. "chokepoint-status-change:hormuz"
+  conflicts: Array<{ _id, status, dayCount, casualties }>,
+  chokepoints: Array<{ _id, status }>,
+  countries: Array<{ _id, risk, leader, tags }>,
+  nsa: Array<{ _id, status, zones }>,
+}
+```
+
+**Indexes:** `{ timestamp: -1 }`
+**Growth rate:** 24/day (hourly scheduled) + event-triggered. ~56MB/month.
+**Retention:** All snapshots kept. Future: thin to daily after 90 days, weekly after 1 year.
+
+### 3.12 `edges` (entity graph)
+
+Normalized adjacency collection. Every entity relationship stored as a uniform edge document.
+
+```ts
+{
+  _id: ObjectId,
+  from: { type: EntityType, id: string },
+  to: { type: EntityType, id: string },
+  relation: EdgeRelation,
+  weight: number,           // 1.0 = explicit (seed), 0.5-0.9 = inferred
+  source: "seed" | "nlp" | "inferred",
+  createdAt: Date,
+}
+```
+
+**Entity types:** country, conflict, chokepoint, nsa, base, trade-route, port, news
+**Relation types:** involves, hosted-by, operated-by, depends-on, ally-of, rival-of, passes-through, originates-at, terminates-at, port-in, participates-in, disrupts, mentions
+
+**Indexes:** `{ "from.type": 1, "from.id": 1 }`, `{ "to.type": 1, "to.id": 1 }`, `{ relation: 1 }`, `{ "from.id": 1, "to.id": 1 }`
+**Size at seed time:** ~2,100 edges (~420KB). Grows incrementally as news is ingested (~5-10 edges per article).
+
+### 3.13 `userSettings` (BYOK configuration)
+
+Per-user LLM API key storage with AES-256-GCM encryption at rest.
+
+```ts
+{
+  _id: string,               // user ID
+  llmProvider: "anthropic" | "openai",
+  llmApiKey: string,         // encrypted
+  llmModel?: string,
+  aiAnalysisEnabled: boolean,
+  createdAt: Date,
+  updatedAt: Date,
+}
+```
+
+### 3.14 `newsAnalysis` (AI-generated event summaries)
+
+Multi-source synthesis produced by Tier 2 BYOK analysis. One per event cluster.
+
+```ts
+{
+  _id: ObjectId,
+  articleIds: string[],
+  summary: string,
+  perspectives: Array<{ source, label, sentiment }>,
+  relevanceScore: number,    // 0-1
+  escalationSignal: "escalating" | "de-escalating" | "stable",
+  relatedCountries: string[],
+  conflictId: string | null,
+  provider: LLMProvider,
+  model: string,
+  userId: string,
+  analyzedAt: Date,
+}
+```
+
+### 3.15 `anomalies` (spike detection log)
+
+Persistent record of detected anomalies for the frontend timeline.
+
+```ts
+{
+  _id: ObjectId,
+  entityType: string,
+  entityId: string,
+  currentCount: number,
+  baselineMean: number,
+  baselineStddev: number,
+  zScore: number,
+  severity: "watch" | "alert" | "critical",
+  hourBucket: string,
+  detectedAt: Date,
+}
+```
+
+**Indexes:** `{ detectedAt: -1 }`, `{ severity: 1 }`, `{ entityType: 1, entityId: 1 }`
 
 ---
 
@@ -506,6 +654,21 @@ data: {"id": "hormuz", "status": "CLOSED"}
 
 event: conflict-update
 data: {"id": "us-iran-war", "dayCount": 19, "latestUpdate": "..."}
+
+event: news-enriched
+data: {"title": "...", "conflictId": "...", "relatedCountries": [...], "relatedChokepoints": [...], "relatedNSA": [...]}
+
+event: news-analysis
+data: {"clusterId": "...", "summary": "...", "escalationSignal": "escalating"}
+
+event: anomaly
+data: {"entityType": "country", "entityId": "IR", "severity": "alert", "zScore": 3.4, "currentCount": 28, "baselineMean": 12}
+
+event: snapshot
+data: {"timestamp": "...", "trigger": "event", "triggerDetail": "chokepoint-status-change:hormuz"}
+
+event: plugin-data
+data: {"pluginId": "acled", "newDocs": 42, "totalDocs": 1200}
 ```
 
 ### 4.5 Aggregate & Compare
@@ -525,9 +688,13 @@ data: {"id": "us-iran-war", "dayCount": 19, "latestUpdate": "..."}
 |--------|-------|-------------|-----------|
 | GET | `/layers/:layer/binary` | Flat binary arrays for Deck.GL | 1h |
 
-Supported layers: `bases`, `nsa-zones`, `chokepoints`, `trade-arcs`, `conflicts`
+Supported core layers: `bases`, `nsa-zones`, `chokepoints`, `trade-arcs`, `conflicts`
+
+Plugin-registered layers are also available at `/layers/:pluginId/binary` (auto-wired by the plugin registry — see Section 4.22).
 
 Returns `application/octet-stream` — `Float32Array` of [lng, lat, ...attributes] per feature. Deck.GL consumes directly without JSON parsing.
+
+**Cache path:** Binary layers use `cacheBinaryAside()` which stores raw `Buffer` in Redis (not JSON-serialized). A 10KB Float32Array stays 10KB in Redis instead of ~50KB as a JSON number array. ~5x less Redis memory, zero-copy response path.
 
 ### 4.7 System
 
@@ -676,25 +843,28 @@ Index values map to enums defined in a shared constants file.
 The periodic module runs scheduled background tasks within the Bun process using `setInterval` (no external cron needed).
 
 **Initial implementation (Phase 1-3):**
-- **Conflict day counter:** Every hour, increment `dayCount` on active conflicts based on `startDate`. Publishes `conflict-update` SSE event.
+- **Conflict day counter:** Every hour, increment `dayCount` on active conflicts based on `startDate`. Publishes `conflict-update` SSE event. Also captures temporal snapshots on each run.
 - **Chokepoint status poller:** Placeholder. Initially manual-only (update via seed or future admin endpoint). When a source is identified, poll on a configurable interval.
+
+**Implemented (Phase 3.5):**
+- **News aggregator:** Three-tier RSS polling pipeline (220+ feeds). Fast tier (15 min): wire services, 24hr news, Google News queries (~40 feeds). Standard tier (60 min): regional dailies, defense, economics, energy (~120 feeds). Slow tier (4 hr): think tanks, research orgs, institutional/gov (~60 feeds). Pipeline: poll → regex RSS/Atom parse → title-hash dedup → NLP enrichment → keyword tag classification → graph edge insertion → Mongo insert → SSE publish → anomaly detection → provenance scoring. Concurrency: 15-20 feeds per batch, 8s per-feed timeout, 25s overall deadline per batch.
+- **Anomaly cleanup:** Every 6 hours, prune Redis counter hashes older than 7 days to bound memory usage (~1.2MB total for ~350 entities × 168 hourly buckets).
 
 **Future additions (post-launch):**
 - **Hegemon re-scraper:** Use Firecrawl to re-scrape hegemonglobal.com on a schedule (daily/weekly, configurable). Parse new bundle, diff against existing data, upsert changes. Publishes SSE events for any risk-level or status changes.
-- **News aggregator:** Poll RSS feeds / external news APIs for new articles. Classify, deduplicate, and insert into `news` collection.
 - **Election countdown:** Daily check to update election status (upcoming -> active -> past) based on `dateISO`.
 
 Each periodic task runs in its own `setInterval` with independent error handling. Failures are logged but do not crash the process or affect other tasks.
 
 ### 4.15 Compute Module
 
-**Deferred to post-launch.** The compute module is a placeholder for CPU-intensive features that will run on Bun worker threads to avoid blocking the HTTP server. Planned capabilities:
+**Partially implemented.** The compute module was originally a placeholder for CPU-intensive features. Two of the three planned capabilities are now partially available via the intelligence pipeline (Phase 3.5):
 
-- **Correlation engine:** Detect connections between events (e.g., oil price spike correlated with Hormuz closure)
-- **Risk forecasting:** ML-based prediction of risk level changes
-- **Sentiment analysis:** Classify news articles by tone and bias
+- **Correlation engine:** Partially implemented via the graph relationship system (`rebuildGraph()` + `/graph/connections` + `/graph/path`). Entity-to-entity links are queryable. Full event-level correlation (e.g., oil price spike correlated with Hormuz closure) remains deferred.
+- **Sentiment analysis:** Available via the BYOK AI analysis module (Tier 2). Users with their own LLM API keys get per-cluster sentiment, bias labeling, and escalation signals. No built-in sentiment model yet.
+- **Risk forecasting:** ML-based prediction of risk level changes. **Still deferred to post-launch.**
 
-These are listed in the project structure to reserve the architectural slot. No implementation is needed for the initial build. When implemented, each capability runs as a Bun `Worker` thread with message-passing to the main process.
+When fully implemented, each capability runs as a Bun `Worker` thread with message-passing to the main process.
 
 ### 4.16 Logging & Observability
 
@@ -727,6 +897,46 @@ Rate limit counters stored in **Redis** using sliding window counters:
 - TTL: 60 seconds (auto-expires, no cleanup needed)
 - Uses `INCR` + `EXPIRE` atomically
 - **Redis down fallback:** Switch to in-memory `Map` with periodic cleanup. Log warning. Limits may be less accurate (per-process, not shared) but the API stays functional.
+
+### 4.18 Timeline (temporal scrubbing)
+
+| Method | Route | Description | Cache TTL |
+|--------|-------|-------------|-----------|
+| GET | `/timeline/at?t=<ISO8601>` | Nearest snapshot at or before time | — |
+| GET | `/timeline/range?from=<ISO>&to=<ISO>&limit=50` | Snapshot series for scrubber animation | — |
+
+The existing `/bootstrap` endpoint also accepts an optional `?at=<ISO8601>` parameter. When present, it returns current static data (bases, ports, trade routes, colors) with historical mutable fields overlaid from the nearest snapshot.
+
+### 4.19 Graph (entity relationships)
+
+| Method | Route | Description | Cache TTL |
+|--------|-------|-------------|-----------|
+| GET | `/graph/connections?entity=<type:id>&depth=1&minWeight=0.5` | Fan-out from entity, N hops | 5m |
+| GET | `/graph/path?from=<type:id>&to=<type:id>` | Shortest path between entities (max 4 hops) | 5m |
+
+### 4.20 Anomalies (spike detection)
+
+| Method | Route | Description | Cache TTL |
+|--------|-------|-------------|-----------|
+| GET | `/anomalies?severity=alert,critical&since=24h` | Recent anomaly alerts | — |
+| GET | `/anomalies/baseline/:type/:id` | 7-day hourly count history for entity | — |
+
+### 4.21 User Settings
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| PUT | `/settings/ai` | Set/update LLM provider + API key (validates before storing) |
+| GET | `/settings/ai` | Get settings (key masked: `sk-ant-...****7x2f`) |
+| DELETE | `/settings/ai` | Remove key, disable AI analysis |
+
+### 4.22 Plugin System
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/plugins/manifest` | All registered plugins with manifests |
+| GET | `/plugins/:id/status` | Plugin health, last poll, doc count |
+| POST | `/plugins/:id/poll` | Manual poll trigger (dev only) |
+| GET | `/layers/:pluginId/binary` | Auto-registered binary layer for source plugins |
 
 ---
 
@@ -1173,6 +1383,27 @@ Badge count shows active layers. Clicking opens dropdown:
 12. Binary layer endpoints
 13. Auth, rate limiting, compression middleware
 
+### Phase 3.5: Intelligence Pipeline
+
+This phase was fully implemented. All items are complete.
+
+39. Binary cache optimization — `cacheBinaryAside()` with raw Buffer
+40. Temporal snapshot infrastructure — `captureSnapshot()`, `/timeline` routes, `/bootstrap?at=` parameter
+41. Entity dictionary — `buildEntityDictionary()` from Mongo collections at startup
+42. NLP enrichment — `enrichNewsItem()` with entity extraction + conflict inference
+43. Graph edge system — `rebuildGraph()` + `/graph/connections` + `/graph/path`
+44. RSS feed registry — 220+ feeds with tier/category metadata
+45. RSS parser — zero-dep regex XML parser for RSS 2.0 and Atom
+46. News aggregator — tiered polling + dedup + enrich + graph + SSE pipeline
+47. BYOK user settings — encrypted API key storage + `/settings/ai` routes
+48. AI analysis module — event clustering + LLM summary/bias/escalation
+49. Plugin registry — manifest-based discovery + auto-wiring (source, layer, enrichment)
+50. Plugin API routes — `/plugins/manifest`, `/plugins/:id/status`
+51. Anomaly detector — z-score spike detection with Redis sliding windows
+52. Anomaly API routes — `/anomalies`, `/anomalies/baseline/:type/:id`
+53. Source provenance — tier registry, citation extraction, corroboration, first-mover
+54. Keyword classifier — tag inference from article title/summary
+
 ### Phase 4: Frontend Shell
 14. Preact + Vite project scaffold
 15. Deck.GL globe view with dark earth texture
@@ -1211,7 +1442,7 @@ Badge count shows active layers. Clicking opens dropdown:
 
 ## 9. Open Questions
 
-1. **Re-scraping cadence:** How often should Hegemon data be refreshed? Manual trigger only, or scheduled (daily/weekly)?
-2. **Additional data sources:** Should the periodic module integrate any of the existing Monitor API sources (ACLED, Finnhub, OpenSky, etc.) from the start, or add them incrementally?
+1. **Re-scraping cadence:** ~~How often should Hegemon data be refreshed? Manual trigger only, or scheduled (daily/weekly)?~~ **Answered:** The Hegemon re-scraper is a future periodic task. RSS ingestion (Phase 3.5) provides continuous fresh data in the meantime.
+2. **Additional data sources:** ~~Should the periodic module integrate any of the existing Monitor API sources (ACLED, Finnhub, OpenSky, etc.) from the start, or add them incrementally?~~ **Answered:** The plugin system (Phase 3.5) provides the architecture. Individual sources (ACLED, Finnhub, OpenSky, etc.) can be added as plugins without modifying core code.
 3. **Deployment target:** Where will the Docker Compose stack run in production? VPS, AWS, Railway, or self-hosted?
 4. **Map tile hosting:** Where will the PMTiles file be hosted? Same server as the API, a CDN, or object storage (S3/R2)?
