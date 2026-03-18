@@ -3,7 +3,6 @@ import { useEffect, useState } from 'preact/hooks';
 import {
   bootstrapData,
   bootstrapLoading,
-  latestEvents,
 } from './state/store';
 import { fetchBootstrap } from './api/bootstrap';
 import { connectSSE, disconnectSSE } from './api/sse';
@@ -14,7 +13,6 @@ import { RightPanel } from './panels/right-panel';
 import { TimelineScrubber } from './panels/timeline-scrubber';
 import { ComparePanel } from './panels/compare-panel';
 import { GraphExplorer } from './panels/graph-explorer';
-import { AnomalyBanner } from './panels/anomaly-banner';
 import { FilterBar } from './panels/filter-bar';
 import { Header } from './panels/header';
 import { SettingsPanel } from './panels/settings-panel';
