@@ -19,6 +19,7 @@ import { TimelineScrubber } from './panels/timeline-scrubber';
 import { ComparePanel } from './panels/compare-panel';
 import { GraphExplorer } from './panels/graph-explorer';
 import { AnomalyBanner } from './panels/anomaly-banner';
+import { FilterBar } from './panels/filter-bar';
 import { Header } from './panels/header';
 import { SettingsPanel } from './panels/settings-panel';
 import { useKeyboardShortcuts } from './components/keyboard-shortcuts';
@@ -94,6 +95,7 @@ export function App() {
         <ErrorBoundary fallback={<div style={{padding: 24, color: 'var(--danger)'}}>Map integration failed</div>}>
           <DeckMap />
         </ErrorBoundary>
+        <FilterBar />
       </div>
 
       {/* Pop Overlays */}
