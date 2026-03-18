@@ -65,12 +65,13 @@
   --z-modal: 100;
 
   /* --- Layout --------------------------------------------- */
-  --sidebar-width: 260px;
+  --header-height: 64px;
+  --sidebar-width: 320px;
   --sidebar-collapsed: 52px;
-  --right-panel-width: 360px;
+  --right-panel-width: 380px;
   --news-panel-width: 280px;
-  --timeline-height: 60px;
-  --alert-height: 36px;
+  --timeline-height: 64px;
+  --alert-height: 0px; /* Alert now inside header */
 
   /* --- Risk colors (shared across themes) ----------------- */
   --risk-catastrophic: #ff2040;
