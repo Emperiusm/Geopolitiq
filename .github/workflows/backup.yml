@@ -1,0 +1,21 @@
+name: Nightly Backup
+on:
+  schedule:
+    - cron: "0 3 * * *"
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run backup
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            BACKUP_NAME="$(date +%Y-%m-%d)"
+            docker exec gambit-mongo mongodump --db=gambit --out="/backups/$BACKUP_NAME"
+            tar -czf "/opt/gambit/backups/${BACKUP_NAME}.tar.gz" -C /opt/gambit/backups "$BACKUP_NAME"
+            rm -rf "/opt/gambit/backups/$BACKUP_NAME"
+            rclone copy "/opt/gambit/backups/${BACKUP_NAME}.tar.gz" r2:gambit-backups/
+            find /opt/gambit/backups -name "*.tar.gz" -mtime +7 -delete
