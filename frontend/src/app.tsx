@@ -3,9 +3,12 @@ import { useEffect, useState } from 'preact/hooks';
 import {
   bootstrapData,
   bootstrapLoading,
+  latestEvents,
+  viewMode,
 } from './state/store';
 import { fetchBootstrap } from './api/bootstrap';
 import { connectSSE, disconnectSSE } from './api/sse';
+import { api } from './api/client';
 
 import { DeckMap } from './map/deck-map';
 import { Sidebar } from './panels/sidebar';
@@ -19,9 +22,11 @@ import { SettingsPanel } from './panels/settings-panel';
 import { useKeyboardShortcuts } from './components/keyboard-shortcuts';
 import { ErrorBoundary } from './components/error-boundary';
 import { Skeleton } from './components/skeleton';
+import { BasemapPicker } from './components/basemap-picker';
 
 export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mapMode, setMapMode] = useState<'globe' | 'flat'>('globe');
 
   // Keyboard shortcuts integration
   useKeyboardShortcuts();
@@ -41,6 +46,15 @@ export function App() {
 
     loadBootstrap();
     connectSSE();
+
+    // Seed the news feed from REST so the right panel isn't empty before SSE delivers events
+    api.news(50)
+      .then((items) => {
+        if (Array.isArray(items) && items.length > 0 && latestEvents.value.length === 0) {
+          latestEvents.value = items;
+        }
+      })
+      .catch(() => { /* SSE will populate later */ });
 
     return () => disconnectSSE();
   }, []);
@@ -75,25 +89,57 @@ export function App() {
         </ErrorBoundary>
       </aside>
 
-      {/* Map viewport — center */}
-      <div class="map-viewport" style={{ background: 'var(--bg-deep)', zIndex: 'var(--z-base)', position: 'relative' }}>
+      {/* Map viewport — center. key={mapMode} forces DeckMap remount on view switch */}
+      <div class="map-viewport" style={{ background: 'var(--globe-bg, var(--bg-deep))', zIndex: 'var(--z-base)', position: 'relative' }}>
         <ErrorBoundary fallback={<div style={{padding: 24, color: 'var(--danger)'}}>Map integration failed</div>}>
-          <DeckMap />
+          <DeckMap key={mapMode} />
         </ErrorBoundary>
         <FilterBar />
+
+        {/* Map controls — bottom-right */}
+        <div style={{
+          position: 'absolute', right: '16px', bottom: '16px',
+          display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end',
+          zIndex: 'var(--z-map-controls)', pointerEvents: 'auto',
+        }}>
+          <BasemapPicker />
+          <div style={{
+            display: 'flex', gap: '1px', overflow: 'hidden',
+            borderRadius: 'var(--radius-lg)',
+            background: 'var(--bg-glass)', backdropFilter: 'blur(var(--glass-blur))',
+            border: '1px solid var(--border-subtle)', boxShadow: 'var(--glass-shadow)',
+          }}>
+            {(['globe', 'flat'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => { setMapMode(mode); viewMode.value = mode; }}
+                style={{
+                  padding: '6px 14px', border: 'none', cursor: 'pointer',
+                  fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  background: mapMode === mode ? 'var(--accent-blue)' : 'transparent',
+                  color: mapMode === mode ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all var(--duration-fast) var(--ease-default)',
+                }}
+              >
+                {mode === 'globe' ? '3D Globe' : '2D Map'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Pop Overlays */}
-      <ErrorBoundary>
+      {/* Pop Overlays — silent fallbacks since these are normally hidden */}
+      <ErrorBoundary fallback={<span />}>
         <GraphExplorer />
       </ErrorBoundary>
-      
-      <ErrorBoundary>
+
+      <ErrorBoundary fallback={<span />}>
         <ComparePanel />
       </ErrorBoundary>
 
       {settingsOpen && (
-        <ErrorBoundary>
+        <ErrorBoundary fallback={<span />}>
           <SettingsPanel onClose={() => setSettingsOpen(false)} />
         </ErrorBoundary>
       )}
