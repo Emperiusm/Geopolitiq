@@ -123,27 +123,55 @@ const political: StyleSpecification = {
   ],
 };
 
-// ── Satellite (stub — requires raster PMTiles) ───────────────
-// Uses Intel style as placeholder until raster PMTiles are sourced.
-// When ready: replace with raster source + vector label overlay.
-const satellite: StyleSpecification = JSON.parse(JSON.stringify(intel));
+// ── Satellite (Sentinel-2 cloudless by EOX) ──────────────────
+// Free global satellite imagery with vector label overlay from Protomaps.
+const satellite: StyleSpecification = {
+  version: 8,
+  glyphs: GLYPHS,
+  sources: {
+    ...COMMON_SOURCE,
+    satellite: {
+      type: 'raster',
+      tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg'],
+      tileSize: 256,
+      attribution: '&copy; <a href="https://s2maps.eu">Sentinel-2 cloudless by EOX</a>',
+    },
+  },
+  layers: [
+    { id: 'background', type: 'background', paint: { 'background-color': '#000408' } },
+    { id: 'satellite-tiles', type: 'raster', source: 'satellite', paint: { 'raster-opacity': 1 } },
+    // Vector labels on top of satellite imagery
+    { id: 'boundaries', type: 'line', source: 'protomaps', 'source-layer': 'boundaries', paint: { 'line-color': 'rgba(255,255,255,0.5)', 'line-width': 1, 'line-opacity': 0.6 } },
+    roads('rgba(255,255,255,0.15)'),
+    placesLabel('#ffffff', 'rgba(0,0,0,0.7)'),
+  ],
+};
 
-// ── Terrain (stub — requires hillshade PMTiles) ──────────────
-// Uses a warm-toned vector style as placeholder until Mapzen DEM PMTiles are sourced.
-// When ready: add hillshade raster source + Maplibre hillshade layer + topo-styled vectors.
+// ── Terrain (hillshade + topo-styled vectors) ────────────────
+// Uses Maplibre demo terrain DEM tiles for hillshade rendering,
+// with Protomaps vectors styled in a topographic palette.
 const terrain: StyleSpecification = {
   version: 8,
   glyphs: GLYPHS,
-  sources: COMMON_SOURCE,
+  sources: {
+    ...COMMON_SOURCE,
+    hillshadeSource: {
+      type: 'raster-dem',
+      url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+      tileSize: 256,
+    },
+  },
   layers: [
-    { id: 'background', type: 'background', paint: { 'background-color': '#1a1810' } },
-    { id: 'earth', type: 'fill', source: 'protomaps', 'source-layer': 'earth', paint: { 'fill-color': '#2a2820' } },
-    { id: 'landuse', type: 'fill', source: 'protomaps', 'source-layer': 'landuse', paint: { 'fill-color': '#2e3a24', 'fill-opacity': 0.5 } },
-    { id: 'natural', type: 'fill', source: 'protomaps', 'source-layer': 'natural', paint: { 'fill-color': '#2a3420', 'fill-opacity': 0.4 } },
-    { id: 'water', type: 'fill', source: 'protomaps', 'source-layer': 'water', paint: { 'fill-color': '#1a2a3a' } },
-    { id: 'boundaries', type: 'line', source: 'protomaps', 'source-layer': 'boundaries', paint: { 'line-color': '#4a4a3e', 'line-width': 0.8, 'line-opacity': 0.6, 'line-dasharray': [4, 2] } },
-    roads('#2a2a22'),
-    placesLabel('#a0a088', '#1a1810'),
+    { id: 'background', type: 'background', paint: { 'background-color': '#f0ead6' } },
+    { id: 'earth', type: 'fill', source: 'protomaps', 'source-layer': 'earth', paint: { 'fill-color': '#e8dcc8' } },
+    { id: 'landuse', type: 'fill', source: 'protomaps', 'source-layer': 'landuse', paint: { 'fill-color': '#c8d8a8', 'fill-opacity': 0.5 } },
+    { id: 'natural', type: 'fill', source: 'protomaps', 'source-layer': 'natural', paint: { 'fill-color': '#b8cc98', 'fill-opacity': 0.4 } },
+    { id: 'water', type: 'fill', source: 'protomaps', 'source-layer': 'water', paint: { 'fill-color': '#8ab4d0' } },
+    // Hillshade relief from DEM tiles
+    { id: 'hills', type: 'hillshade', source: 'hillshadeSource', layout: { visibility: 'visible' }, paint: { 'hillshade-shadow-color': '#473B24', 'hillshade-illumination-anchor': 'map', 'hillshade-exaggeration': 0.3 } },
+    { id: 'boundaries', type: 'line', source: 'protomaps', 'source-layer': 'boundaries', paint: { 'line-color': '#8a7a6a', 'line-width': 1, 'line-opacity': 0.7, 'line-dasharray': [4, 2] } },
+    roads('#c8b898'),
+    placesLabel('#4a3a2a', '#f0ead6'),
   ],
 };
 
