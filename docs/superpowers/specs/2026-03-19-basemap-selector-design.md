@@ -56,7 +56,7 @@ Mounted in `app.tsx` alongside the view-mode buttons in the bottom-right map con
 
 ## Data Flow
 
-### Store (`state/store.ts`)
+### Store (`frontend/src/state/store.ts`)
 
 New signal:
 ```typescript
@@ -93,9 +93,9 @@ Satellite and Terrain styles reference raster PMTiles sources plus vector label 
   - Light: `[220, 230, 240, 255]` (light grey-blue)
   - Political: `[180, 200, 220, 255]` (neutral blue)
 
-### Day/Night Tint Adjustments (`day-night.ts`)
+### Day/Night Tint Adjustments (`deck-map.tsx` — `handleDayNightTint`)
 
-Tint opacity scale factor per basemap since styles have different base brightness:
+Tint opacity scale factor per basemap, applied in `deck-map.tsx` where the `--map-tint` CSS variable is set (not in `day-night.ts` which only computes solar position). Scale factor multiplies the base tint opacity:
 
 | Basemap | Tint Scale | Reason |
 |---------|-----------|--------|
@@ -129,6 +129,15 @@ These are polish items to tune during implementation, not blocking architecture 
 
 Add `B` key to cycle through basemaps (Intel → Satellite → Terrain → Light → Oceanic → Political → Intel). Integrates with existing keyboard shortcuts infrastructure in `frontend/src/components/keyboard-shortcuts.ts`.
 
+## Prerequisites
+
+**Raster PMTiles for Satellite and Terrain** do not exist yet and must be sourced/converted before those two styles can be implemented:
+
+- **Satellite:** Convert Sentinel-2 or USGS open imagery to raster PMTiles using `pmtiles convert`. Host on Cloudflare R2 or S3. Target zoom 0-12 globally (~5-10GB).
+- **Terrain hillshade:** Convert Mapzen Terrain Tiles (available on AWS Open Data) to PMTiles. Target zoom 0-12 (~2-5GB).
+
+The 4 vector styles (Intel, Light, Oceanic, Political) have no prerequisites — they restyle the existing Protomaps PMTiles source. Implementation should start with these 4, then add Satellite and Terrain once raster tiles are available.
+
 ## Future Considerations (not in scope)
 
 - **Preset-basemap coupling:** Layer presets (Trade Risk, Conflict Zone) could auto-switch basemap. Deferred — keep them independent for now.
@@ -143,7 +152,7 @@ Add `B` key to cycle through basemaps (Intel → Satellite → Terrain → Light
 | Create | `frontend/src/components/basemap-picker.tsx` | Picker button + popover component |
 | Modify | `frontend/src/map/flat-view.ts` | Remove hardcoded style, use basemap signal |
 | Modify | `frontend/src/map/deck-map.tsx` | Ocean polygon color per basemap |
-| Modify | `frontend/src/map/day-night.ts` | Tint scale factor per basemap |
+| Modify | `frontend/src/map/deck-map.tsx` | Day/night tint scale per basemap |
 | Modify | `frontend/src/state/store.ts` | Add `basemap` signal + localStorage persistence |
 | Modify | `frontend/src/app.tsx` | Mount basemap picker in bottom-right controls |
 | Modify | `frontend/src/components/keyboard-shortcuts.ts` | Add `B` key shortcut |
