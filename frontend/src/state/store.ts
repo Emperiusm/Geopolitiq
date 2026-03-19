@@ -11,6 +11,7 @@ import { signal, computed } from '@preact/signals';
 export type RiskLevel = 'catastrophic' | 'extreme' | 'severe' | 'stormy' | 'cloudy' | 'clear';
 export type ViewMode = 'globe' | 'flat';
 export type Theme = 'dark' | 'light';
+export type BasemapId = 'intel' | 'satellite' | 'terrain' | 'light' | 'oceanic' | 'political';
 
 export interface Country {
   _id: string;
@@ -92,6 +93,16 @@ export const theme = signal<Theme>(
   (document.documentElement.getAttribute('data-theme') as Theme) || 'dark'
 );
 export const viewMode = signal<ViewMode>('globe');
+
+const BASEMAP_IDS: BasemapId[] = ['intel', 'satellite', 'terrain', 'light', 'oceanic', 'political'];
+
+function loadBasemap(): BasemapId {
+  const stored = localStorage.getItem('gambit-basemap');
+  return BASEMAP_IDS.includes(stored as BasemapId) ? (stored as BasemapId) : 'intel';
+}
+
+export const basemap = signal<BasemapId>(loadBasemap());
+
 export const sidebarOpen = signal(true);
 export const rightPanelOpen = signal(false);
 export const newsPanelOpen = signal(false);
@@ -178,6 +189,16 @@ export function toggleTheme() {
   const next = theme.value === 'dark' ? 'light' : 'dark';
   theme.value = next;
   document.documentElement.setAttribute('data-theme', next);
+}
+
+export function setBasemap(id: BasemapId) {
+  basemap.value = id;
+  localStorage.setItem('gambit-basemap', id);
+}
+
+export function cycleBasemap() {
+  const idx = BASEMAP_IDS.indexOf(basemap.value);
+  setBasemap(BASEMAP_IDS[(idx + 1) % BASEMAP_IDS.length]);
 }
 
 export function toggleLayer(key: keyof LayerState) {
