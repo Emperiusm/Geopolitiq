@@ -1,9 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { basemap, setBasemap, type BasemapId } from '../state/store';
+import { basemap, setBasemap, BASEMAP_IDS } from '../state/store';
 import { BASEMAP_LABELS, BASEMAP_THUMBNAILS } from '../map/basemap-styles';
-
-const BASEMAP_IDS: BasemapId[] = ['intel', 'satellite', 'terrain', 'light', 'oceanic', 'political'];
 
 export function BasemapPicker() {
   const [open, setOpen] = useState(false);

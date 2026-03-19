@@ -2,7 +2,7 @@ import { h } from 'preact';
 import { useRef, useEffect, useCallback } from 'preact/hooks';
 import { Deck, _GlobeView as GlobeView, MapView } from '@deck.gl/core';
 import { GLOBE_INITIAL_VIEW_STATE } from './globe-view';
-import { createFlatView, initPMTiles, getMapStyle } from './flat-view';
+import { initPMTiles, getMapStyle } from './flat-view';
 import maplibregl from 'maplibre-gl';
 import { OCEAN_COLORS, TINT_SCALE } from './basemap-styles';
 import { handleViewStateChange } from './view-transition';

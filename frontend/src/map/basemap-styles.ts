@@ -126,7 +126,7 @@ const political: StyleSpecification = {
 // ── Satellite (stub — requires raster PMTiles) ───────────────
 // Uses Intel style as placeholder until raster PMTiles are sourced.
 // When ready: replace with raster source + vector label overlay.
-const satellite: StyleSpecification = { ...intel };
+const satellite: StyleSpecification = JSON.parse(JSON.stringify(intel));
 
 // ── Terrain (stub — requires hillshade PMTiles) ──────────────
 // Uses a warm-toned vector style as placeholder until Mapzen DEM PMTiles are sourced.

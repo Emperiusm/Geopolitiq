@@ -94,7 +94,7 @@ export const theme = signal<Theme>(
 );
 export const viewMode = signal<ViewMode>('globe');
 
-const BASEMAP_IDS: BasemapId[] = ['intel', 'satellite', 'terrain', 'light', 'oceanic', 'political'];
+export const BASEMAP_IDS: BasemapId[] = ['intel', 'satellite', 'terrain', 'light', 'oceanic', 'political'];
 
 function loadBasemap(): BasemapId {
   const stored = localStorage.getItem('gambit-basemap');
