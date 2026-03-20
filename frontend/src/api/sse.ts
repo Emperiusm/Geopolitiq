@@ -1,7 +1,7 @@
 /**
  * GAMBIT — SSE Client
  *
- * EventSource with reconnect logic for all 9 event types.
+ * EventSource with reconnect logic for all 16 event types.
  */
 import {
   bootstrapData,
@@ -12,8 +12,9 @@ import {
   timelinePosition,
 } from '@/state/store';
 import type { NewsItem, NewsAnalysis, Anomaly } from '@/state/store';
+import { fetchBootstrap } from '@/api/bootstrap';
 
-const SSE_URL = (import.meta.env.VITE_API_URL || '/api/v1').replace('/api/v1', '') + '/events/stream';
+const SSE_URL = (import.meta.env.VITE_API_URL || '/api/v1') + '/events/stream';
 
 let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -115,6 +116,52 @@ export function connectSSE(): void {
   eventSource.addEventListener('plugin-data', (e) => {
     const { pluginId, newDocs, totalDocs } = JSON.parse(e.data);
     console.log(`[SSE] Plugin data: ${pluginId} +${newDocs} (${totalDocs} total)`);
+  });
+
+  // 10. graph:batch — bulk graph data (nodes/edges)
+  eventSource.addEventListener('graph:batch', (e) => {
+    const data = JSON.parse(e.data);
+    console.log('[sse] graph:batch', data);
+  });
+
+  // 11. graph:belief-updated — a belief/claim on an entity changed
+  eventSource.addEventListener('graph:belief-updated', (e) => {
+    const data = JSON.parse(e.data);
+    console.log('[sse] belief updated:', data.entityLabel, data.topic, data.newContent);
+  });
+
+  // 12. graph:claim-disputed — a claim was flagged as disputed
+  eventSource.addEventListener('graph:claim-disputed', (e) => {
+    const data = JSON.parse(e.data);
+    console.log('[sse] claim disputed:', data.entityLabel, data.topic);
+  });
+
+  // 13. agent:status — heartbeat from intelligence agents
+  eventSource.addEventListener('agent:status', (e) => {
+    const data = JSON.parse(e.data);
+    console.log('[sse] agent status:', data.agents?.length, 'agents');
+  });
+
+  // 14. agent:extraction — agent finished extracting claims from articles
+  eventSource.addEventListener('agent:extraction', (e) => {
+    const data = JSON.parse(e.data);
+    console.log('[sse] extraction:', data.claimsCreated, 'claims from', data.articleCount, 'articles');
+  });
+
+  // 15. state:stale — backend signals that cached state is outdated
+  eventSource.addEventListener('state:stale', () => {
+    console.warn('[sse] state stale — re-bootstrapping');
+    fetchBootstrap(true).then(data => {
+      bootstrapData.value = data;
+    }).catch(err => {
+      console.error('[sse] re-bootstrap failed', err);
+    });
+  });
+
+  // 16. news:cluster — a cluster of related articles was detected
+  eventSource.addEventListener('news:cluster', (e) => {
+    const data = JSON.parse(e.data);
+    console.log('[sse] news cluster:', data.clusterSize, 'articles');
   });
 }
 
