@@ -34,7 +34,7 @@ import { compareRouter } from "./modules/aggregate/compare";
 import { binaryLayersRouter } from "./modules/binary/layers";
 import { seedRoutes } from "./modules/system/seed-routes";
 import { timelineRouter } from "./modules/aggregate/timeline";
-import { graphRouter } from "./modules/aggregate/graph";
+import { graphApiRouter } from "./modules/graph/index";
 import { startConflictCounter } from "./modules/periodic/conflict-counter";
 import { ensureSnapshotIndexes } from "./infrastructure/snapshots";
 import { buildEntityDictionary } from "./infrastructure/entity-dictionary";
@@ -140,7 +140,7 @@ api.route("/viewport", viewportRouter);
 api.route("/search", searchRouter);
 api.route("/compare", compareRouter);
 api.route("/timeline", timelineRouter);
-api.route("/graph", graphRouter);
+api.route("/graph", graphApiRouter);
 api.route("/anomalies", anomaliesRouter);
 
 // Binary layers
