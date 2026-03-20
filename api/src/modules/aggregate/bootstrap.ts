@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { getDb } from "../../infrastructure/mongo";
 import { cacheAside } from "../../infrastructure/cache";
 import { getSnapshotAt } from "../../infrastructure/snapshots";
+import { readTx, isNeo4jConnected } from "../../infrastructure/neo4j";
 import { success, validationError } from "../../helpers/response";
 import type { TemporalSnapshot } from "../../types";
 
@@ -75,6 +76,27 @@ function applySnapshot(
   return data;
 }
 
+async function fetchGraphStats(): Promise<Record<string, any> | null> {
+  if (!isNeo4jConnected()) return null;
+  try {
+    return await readTx(async (tx) => {
+      const nodeRes = await tx.run(`MATCH (n:Entity) RETURN n.type AS type, count(n) AS cnt`);
+      const nodes = Object.fromEntries(nodeRes.records.map(r => [r.get("type"), r.get("cnt").toNumber()]));
+
+      const claimRes = await tx.run(`MATCH (c:Claim) RETURN c.status AS status, count(c) AS cnt`);
+      const claims = Object.fromEntries(claimRes.records.map(r => [r.get("status"), r.get("cnt").toNumber()]));
+
+      const edgeRes = await tx.run(`MATCH ()-[r]->() RETURN type(r) AS type, count(r) AS cnt ORDER BY cnt DESC LIMIT 20`);
+      const edges = Object.fromEntries(edgeRes.records.map(r => [r.get("type"), r.get("cnt").toNumber()]));
+
+      return { nodes, claims, edges };
+    });
+  } catch (err) {
+    console.warn("[bootstrap] graph stats failed:", err);
+    return null;
+  }
+}
+
 bootstrapRouter.get("/", async (c) => {
   const slim = c.req.query("slim") === "true";
   const at = c.req.query("at");
@@ -88,10 +110,14 @@ bootstrapRouter.get("/", async (c) => {
     if (!snapshot) return validationError(c, "No snapshots available before requested time");
 
     const db = getDb();
-    const data = await fetchBootstrapData(db, slim);
+    const [data, graphStats, agentStatus] = await Promise.all([
+      fetchBootstrapData(db, slim),
+      fetchGraphStats(),
+      db.collection("agent_registry").find({}).toArray(),
+    ]);
     applySnapshot(data, snapshot);
 
-    return success(c, data, {
+    return success(c, { ...data, graphStats, agentStatus }, {
       freshness: snapshot.timestamp.toISOString(),
       at,
       snapshotAt: snapshot.timestamp.toISOString(),
@@ -106,5 +132,12 @@ bootstrapRouter.get("/", async (c) => {
     return fetchBootstrapData(db, slim);
   }, 3600);
 
-  return success(c, data, { freshness: new Date().toISOString(), cached: !!data._cached });
+  // Graph stats + agent status fetched outside cache (live data)
+  const db = getDb();
+  const [graphStats, agentStatus] = await Promise.all([
+    fetchGraphStats(),
+    db.collection("agent_registry").find({}).toArray(),
+  ]);
+
+  return success(c, { ...data, graphStats, agentStatus }, { freshness: new Date().toISOString(), cached: !!data._cached });
 });
