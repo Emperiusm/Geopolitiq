@@ -3,7 +3,7 @@ import { getRedis, isRedisConnected } from "./redis";
 
 const CHANNEL = "gambit:events:new";
 const BUFFER_KEY = "gambit:events:buffer";
-const MAX_BUFFER = Number(process.env.SSE_BUFFER_SIZE ?? 100);
+const MAX_BUFFER = Number(process.env.SSE_BUFFER_SIZE ?? 1000);
 
 let eventCounter = 0;
 
@@ -33,7 +33,16 @@ export async function getBufferedEvents(afterId?: string): Promise<SSEEvent[]> {
 
   if (afterId) {
     const idx = events.findIndex((e) => e.id === afterId);
-    return idx >= 0 ? events.slice(idx + 1) : events;
+    if (idx >= 0) return events.slice(idx + 1);
+    // afterId not found in buffer — client's cursor is too old
+    return [
+      {
+        id: "0",
+        event: "state:stale",
+        data: JSON.stringify({ reason: "Events older than buffer" }),
+      },
+      ...events,
+    ];
   }
 
   return events;
