@@ -20,7 +20,7 @@ This spec defines the first vertical of that intelligence layer: a Neo4j knowled
 | Graph database | Neo4j Community 5.x | Purpose-built for graphs. 1M+ nodes is within sweet spot. Cypher is expressive. Battle-tested. |
 | Data model | Claim-as-atom | Atomic assertions enable provenance, contradiction detection, temporal tracking, and combinatorial discovery. Inspired by Zettelkasten/SRP principles. |
 | First agent | News/RSS | Free data source (RSS), high volume, exercises full pipeline, well-understood extraction task. |
-| LLM extraction | Claude Haiku (free tier) | 5 req/min, 10K input tokens/min. Sufficient for ~200 articles/hour with rate-limited queue. |
+| LLM extraction | Claude Haiku (free tier) | 5 req/min, 10K input tokens/min. Floor: 240 solo articles/hour. With clustering (~3 articles/cluster avg): ~720 articles/hour. |
 | Local model | Ollama + mxbai-embed-large | 1024-dim embeddings, runs on 1080 Ti (1.2GB VRAM), enables semantic search and vector dedup from day one at zero API cost. |
 | Approach | Parallel tracks | Migrate existing data into Neo4j AND build agent pipeline simultaneously. They converge when the agent writes into a graph that already contains reference entities. |
 
@@ -49,7 +49,7 @@ Entities are stable identity anchors with immutable properties. All mutable asse
 
 ### 2.2 Entity Nodes (Tier 1 — Stable Anchors)
 
-Only immutable and display properties live on entity nodes.
+Only immutable and display properties live on entity nodes. All entity nodes carry a secondary `:Entity` label for generic queries (e.g., `CREATE (n:Country:Entity {...})`). This enables `MATCH (n:Entity {id: $id})` across all types.
 
 | Label | ID Pattern | Properties |
 |---|---|---|
@@ -168,16 +168,18 @@ attribution, severity
 
 ### 2.8 Index Strategy
 
+All entity nodes carry the `:Entity` secondary label, enabling generic indexes. Neo4j Community Edition does not support composite range indexes, so we use separate single-property indexes.
+
 ```cypher
-// Entity lookups
+// Entity lookups (via secondary :Entity label)
 CREATE INDEX entity_id IF NOT EXISTS FOR (n:Entity) ON (n.id);
 CREATE INDEX entity_type IF NOT EXISTS FOR (n:Entity) ON (n.type);
 
-// Claim queries (the hot path)
+// Claim queries (the hot path — separate indexes, no composite on Community)
 CREATE INDEX claim_fingerprint IF NOT EXISTS FOR (n:Claim) ON (n.fingerprint);
 CREATE INDEX claim_topic IF NOT EXISTS FOR (n:Claim) ON (n.topic);
 CREATE INDEX claim_status IF NOT EXISTS FOR (n:Claim) ON (n.status);
-CREATE COMPOSITE INDEX claim_lookup IF NOT EXISTS FOR (n:Claim) ON (n.topic, n.status, n.confidence);
+CREATE INDEX claim_confidence IF NOT EXISTS FOR (n:Claim) ON (n.confidence);
 
 // Alias resolution
 CREATE INDEX alias_lookup IF NOT EXISTS FOR (n:Alias) ON (n.alias);
@@ -185,8 +187,13 @@ CREATE INDEX alias_lookup IF NOT EXISTS FOR (n:Alias) ON (n.alias);
 // Event sourcing
 CREATE INDEX event_timestamp IF NOT EXISTS FOR (n:GraphEvent) ON (n.timestamp);
 
-// Spatial
-CREATE POINT INDEX entity_location IF NOT EXISTS FOR (n:Entity) ON (n.location);
+// Spatial (per-label for types that carry location)
+CREATE POINT INDEX country_location IF NOT EXISTS FOR (n:Country) ON (n.location);
+CREATE POINT INDEX base_location IF NOT EXISTS FOR (n:MilitaryBase) ON (n.location);
+CREATE POINT INDEX conflict_location IF NOT EXISTS FOR (n:Conflict) ON (n.location);
+CREATE POINT INDEX chokepoint_location IF NOT EXISTS FOR (n:Chokepoint) ON (n.location);
+CREATE POINT INDEX election_location IF NOT EXISTS FOR (n:Election) ON (n.location);
+CREATE POINT INDEX port_location IF NOT EXISTS FOR (n:Port) ON (n.location);
 
 // Fulltext search
 CREATE FULLTEXT INDEX entity_search IF NOT EXISTS FOR (n:Entity) ON EACH [n.label];
@@ -428,17 +435,23 @@ interface ExtractionResult {
 
 ### 4.3 Source Trust Tiers
 
-Applied to claim confidence as a multiplier:
+The existing codebase defines a 6-level `SourceTier` type in `api/src/types/index.ts` with 120+ domain mappings in `infrastructure/source-tiers.ts`. The intelligence layer reuses this system with a numeric multiplier for claim confidence weighting:
 
 ```typescript
-const SOURCE_TIERS = {
-  1: { multiplier: 1.0,  sources: ["reuters", "ap", "bbc", "afp"] },
-  2: { multiplier: 0.9,  sources: ["nytimes", "guardian", "aljazeera"] },
-  3: { multiplier: 0.75, sources: ["regional outlets, named sources"] },
-  4: { multiplier: 0.5,  sources: ["unvetted, anonymous, blog"] },
+import type { SourceTier } from "../types";
+
+const TIER_MULTIPLIER: Record<SourceTier, number> = {
+  primary: 1.0,        // wire services: reuters, ap, afp
+  established: 0.9,    // major outlets: bbc, nytimes, guardian, aljazeera
+  specialized: 0.85,   // domain-specific: janes, lloyds, acled
+  regional: 0.75,      // regional outlets with named sources
+  aggregator: 0.5,     // content aggregators
+  unknown: 0.4,        // unvetted, anonymous, blog
 };
-// claim.confidence = extraction.confidence * tier.multiplier
+// claim.confidence = extraction.confidence * TIER_MULTIPLIER[article.sourceTier]
 ```
+
+The multiplier mapping lives in `seed/source-tiers.ts` and imports tier lookups from the existing `infrastructure/source-tiers.ts`.
 
 ### 4.4 Entity Resolution Flow
 
@@ -499,20 +512,23 @@ const newsWorker = new Worker('ingest:news', processArticle, {
 });
 ```
 
-**Rate limit handling (429):** Does NOT count as a failure attempt. Re-queues with `retry-after` delay:
+**Rate limit handling (429):** Does NOT count as a failure attempt. Re-queues with delay via BullMQ's `moveToDelayed` API:
 
 ```typescript
 if (error.status === 429) {
   const retryAfter = error.headers?.['retry-after'] || 30;
-  throw new DelayedError(retryAfter * 1000);
+  await job.moveToDelayed(Date.now() + retryAfter * 1000);
+  return; // exit worker without counting as failure
 }
 ```
 
 **Stale job handling:** Articles in queue > 24 hours are still processed but tagged `stale: true` with confidence penalty (`* 0.8`).
 
+**Ollama unavailable mid-pipeline:** If Ollama is down during the embedding step, claims are written to Neo4j with `embedding: null`. A background backfill job periodically queries for claims with null embeddings and batch-embeds them when Ollama returns. This avoids wasting Haiku API calls on full-job retries.
+
 ### 4.7 Regex Fallback
 
-When Haiku is unavailable or rate-limited, the existing regex/keyword extraction runs. Produces the same `ExtractionResult` shape but with confidence capped at 0.6. Articles tagged `enrichment: "regex"`. BullMQ re-queues for Haiku processing when the API is available.
+When Haiku is unavailable or rate-limited, the existing regex/keyword extraction runs. Produces the same `ExtractionResult` shape but with confidence capped at 0.6. Articles tagged `extractionMethod: "regex"` (not `enrichment` — that's a claim topic for nuclear enrichment). BullMQ re-queues for Haiku processing when the API is available.
 
 ### 4.8 Agent Definition
 
@@ -608,7 +624,42 @@ interface EntityDetailResponse {
 }
 ```
 
-### 5.4 Graph Response (connections, paths, viewport)
+### 5.4 Shared Response Types
+
+```typescript
+interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  lat?: number;
+  lng?: number;
+  confidence: number;
+  firstSeen: string;
+  lastUpdated: string;
+}
+
+interface GraphEdge {
+  from: string;
+  to: string;
+  relation: string;
+  weight: number;
+  confidence: number;
+  sourceCount: number;
+}
+
+interface ClaimSummary {
+  id: string;
+  content: string;
+  topic: string;
+  confidence: number;
+  status: string;
+  sourceCount: number;
+  extractedAt: string;
+  agentId: string;
+}
+```
+
+### 5.5 Graph Response (connections, paths, viewport)
 
 ```typescript
 interface GraphResponse {
@@ -625,7 +676,7 @@ interface GraphResponse {
 }
 ```
 
-### 5.5 Existing Endpoints That Change
+### 5.6 Existing Endpoints That Change
 
 | Endpoint | Change |
 |---|---|
@@ -635,27 +686,30 @@ interface GraphResponse {
 | `/graph` (existing) | Rewritten to query Neo4j |
 | `/anomalies` | Enriched with claim context from Neo4j |
 
-### 5.6 Existing Endpoints Unchanged
+### 5.7 Existing Endpoints Unchanged
 
 All reference data (`/countries`, `/bases`, etc.), `/news`, auth, teams, settings, admin. Still work, still cached, not broken.
 
-### 5.7 Team Scope Enforcement
+### 5.8 Team Scope Enforcement
 
-Middleware injects team `dataScope` into every Neo4j query as `WHERE` clause:
+Middleware injects team `dataScope` into every Neo4j query. Uses a query-builder pattern that correctly handles `WHERE`/`AND` context:
 
 ```typescript
-function applyScope(cypher: string, scope: TeamScope): string {
+function buildScopeClause(scope: TeamScope, varName: string = "n"): string {
+  const conditions: string[] = [];
   if (scope.entityTypes !== "*") {
-    cypher += ` AND n.type IN $allowedTypes`;
+    conditions.push(`${varName}.type IN $allowedTypes`);
   }
   if (scope.regions !== "*") {
-    cypher += ` AND n.region IN $allowedRegions`;
+    conditions.push(`${varName}.region IN $allowedRegions`);
   }
-  return cypher;
+  return conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 }
 ```
 
-### 5.8 Caching
+All scopeable queries use this builder rather than string concatenation.
+
+### 5.9 Caching
 
 Redis cache-aside, same pattern as existing endpoints:
 
@@ -689,9 +743,21 @@ Cache invalidation: `graph:batch` SSE event → bust cache entries for affected 
 
 `graph:belief-updated` and `graph:claim-disputed` include entity context (label, type, lat, lng) so the frontend can highlight on the map without a follow-up API call.
 
-### 6.2 Existing Events Unchanged
+### 6.2 Existing Event Migration
 
-`conflict-update`, `snapshot`, `anomaly`, `heartbeat`, `auth-expired`.
+| Current Event | Fate | Notes |
+|---|---|---|
+| `conflict-update` | **Unchanged** | Conflict day counter, periodic task |
+| `snapshot` | **Unchanged** | Temporal snapshot capture |
+| `anomaly` | **Unchanged** | Redis z-score anomaly detection |
+| `heartbeat` | **Unchanged** | Keep-alive |
+| `auth-expired` | **Unchanged** | Session invalidation |
+| `news` | **Unchanged** | Raw article arrival, still useful for news feed |
+| `news-enriched` | **Deprecated** | Replaced by `agent:extraction` when agent pipeline active |
+| `news-analysis` | **Unchanged** | BYOK LLM analysis (user-initiated, separate from agent pipeline) |
+| `risk-change` | **Deprecated** | Replaced by `graph:belief-updated` with `topic: "risk"` |
+| `plugin-poll` | **Unchanged** | Plugin system |
+| `plugin-data` | **Unchanged** | Plugin system |
 
 ### 6.3 Event Volume
 
@@ -952,7 +1018,7 @@ Weekly Neo4j dump:
 docker exec neo4j neo4j-admin database dump neo4j --to-path=/backups/
 ```
 
-Backup volume mounted in Docker Compose. Migration script can rebuild from MongoDB, but that loses agent-extracted intelligence.
+Backup volume mounted in Docker Compose. Retain last 4 weekly backups, delete older ones before each new dump. Migration script can rebuild from MongoDB, but that loses agent-extracted intelligence.
 
 ---
 
@@ -967,8 +1033,21 @@ Not a frontend redesign — just wiring changes to make the intelligence layer v
 | Graph explorer | Point at `/graph/entity/:id/connections` instead of old edges collection |
 | Alert banner | Consume `graph:claim-disputed` and `graph:belief-updated` SSE events |
 | Sidebar agent status | Consume `agent:status` SSE events |
+| SSE client | Add `state:stale` handler that triggers full bootstrap re-fetch on reconnection gap |
+| SSE client | Deprecate `news-enriched` and `risk-change` handlers, replaced by agent events |
 
 Existing components handle rendering — they just get new data sources.
+
+### 8.1 Existing Type Migration
+
+The existing codebase defines `EntityType` and `EdgeRelation` in `api/src/types/index.ts`. The intelligence layer introduces Neo4j-native types (`:Country`, `:OPERATED_BY`, etc.) that differ in naming convention. During the transition:
+
+- The MongoDB `edges` collection continues to exist but is no longer the primary graph source
+- The existing `graph.ts` aggregate module is rewritten to query Neo4j
+- Existing `EntityType` and `EdgeRelation` types are deprecated in favor of Neo4j labels and relationship types
+- A mapping utility converts between old and new naming for any endpoints that still serve the old format during migration
+
+Existing reference data endpoints (`/countries`, `/bases`, etc.) continue reading from MongoDB unchanged.
 
 ---
 
@@ -983,5 +1062,5 @@ Designed for but not implemented in this spec:
 | Agents 2–10 | After News/RSS proven | Same pipeline interfaces, different prompts + data sources |
 | Orchestrator expansion | Multiple agents exist | Expand `orchestrator.ts` skeleton with routing + conflict resolution |
 | Neo4j GDS | Pattern recognition agents | Add GDS plugin to Docker Compose, ~200MB memory |
-| Qwen local pre-filter | GPU upgrade | Add to pipeline before BullMQ, same `ExtractionResult` interface |
+| Qwen local pre-filter | GPU upgrade | Add to pipeline before BullMQ, same `ExtractionResult` interface. Requires GPU upgrade or switching `OLLAMA_KEEP_ALIVE` to timeout for model swapping — 1080 Ti (11GB) cannot keep both mxbai-embed-large and Qwen 7B loaded simultaneously. |
 | Server-side SSE filtering | Many concurrent clients | Add subscription channels to SSE connection |
