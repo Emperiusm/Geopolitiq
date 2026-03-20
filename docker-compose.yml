@@ -168,5 +168,51 @@ services:
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
     profiles: ["prod"]
 
+  # ═══════════════════════════════════════════════════
+  # INTELLIGENCE LAYER — Neo4j, Ollama, BullMQ
+  # ═══════════════════════════════════════════════════
+
+  neo4j:
+    image: neo4j:5-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-backups:/backups
+    environment:
+      NEO4J_AUTH: neo4j/gambit-dev
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1g
+      NEO4J_server_memory_pagecache_size: 512m
+      NEO4J_db_tx__timeout: 30s
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_NUM_GPU: "99"
+
+  bullmq-dashboard:
+    image: taskforcesh/bullmq-dashboard
+    ports:
+      - "3001:3001"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
 volumes:
   mongo-data:
+  neo4j-data:
+  neo4j-backups:
+  ollama-models:
