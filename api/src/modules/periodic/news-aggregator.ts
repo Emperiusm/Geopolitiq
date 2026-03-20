@@ -7,6 +7,7 @@ import { captureSnapshot } from "../../infrastructure/snapshots";
 import { clusterArticles, analyzeForUser, getAIEnabledUsers } from "../../infrastructure/ai-analysis";
 import { recordAndDetect } from "../../infrastructure/anomaly-detector";
 import { buildStandaloneProvenance } from "../../infrastructure/provenance";
+import { enqueueNewArticles } from "../../agents/news-rss/fetcher";
 import type { GraphEdge } from "../../types";
 
 const BATCH_CONCURRENCY = Number(process.env.NEWS_BATCH_CONCURRENCY ?? 15);
@@ -236,6 +237,14 @@ async function pollTier(tier: FeedTier): Promise<{ fetched: number; inserted: nu
     }
 
     console.log(`[news] ${tier}: fetched=${articles.length} inserted=${inserted} deduped=${deduped}`);
+
+    // Enqueue new articles for agent extraction (if enabled)
+    if (inserted > 0) {
+      await enqueueNewArticles().catch((err) =>
+        console.error("[news] Agent enqueue error:", err),
+      );
+    }
+
     return { fetched: articles.length, inserted, deduped };
   } catch (err) {
     console.error(`[news] ${tier} poll error:`, err);

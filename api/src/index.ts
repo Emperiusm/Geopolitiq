@@ -52,6 +52,12 @@ import { teamSettingsRoutes } from "./modules/system/team-settings-routes";
 import { notificationRoutes } from "./modules/system/notification-routes";
 import { adminRoutes } from "./modules/system/admin-routes";
 import { startAccountCleanup } from "./modules/periodic/account-cleanup";
+import { connectNeo4j, isNeo4jConnected, closeNeo4j } from "./infrastructure/neo4j";
+import { checkOllama } from "./infrastructure/ollama";
+import { closeAllQueues } from "./infrastructure/queue";
+import { ensureNeo4jSchema } from "./seed/seed-neo4j-schema";
+import { ensureAgentRegistered, NEWS_RSS_AGENT } from "./agents/registry";
+import { startNewsWorker } from "./agents/news-rss/worker";
 import type { AppVariables } from "./types/auth";
 
 const app = new Hono<{ Variables: AppVariables }>();
@@ -189,7 +195,46 @@ async function start() {
   startAnomalyCleanup();
   startNewsAggregator();
   startAccountCleanup();
+
+  // Neo4j + Ollama (non-fatal — warn on failure)
+  let neo4jReady = false;
+  try {
+    await connectNeo4j();
+    await ensureNeo4jSchema();
+    neo4jReady = true;
+    console.log("[gambit] Neo4j connected + schema ensured");
+  } catch (err) {
+    console.warn("[gambit] Neo4j unavailable (graph features disabled):", err);
+  }
+
+  try {
+    await checkOllama();
+  } catch (err) {
+    console.warn("[gambit] Ollama unavailable (embeddings disabled):", err);
+  }
+
+  // Start news agent worker if Neo4j is connected and agent is enabled
+  if (neo4jReady && process.env.AGENT_NEWS_ENABLED === "true") {
+    try {
+      await ensureAgentRegistered(NEWS_RSS_AGENT.id, NEWS_RSS_AGENT);
+      startNewsWorker();
+      console.log("[gambit] News agent worker started");
+    } catch (err) {
+      console.warn("[gambit] News agent startup failed:", err);
+    }
+  }
 }
+
+// Graceful shutdown
+async function shutdown() {
+  console.log("[gambit] Shutting down...");
+  try { await closeAllQueues(); } catch {}
+  try { await closeNeo4j(); } catch {}
+  process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 start();
 
