@@ -36,7 +36,7 @@ This enables combinatorial intelligence — atomic units recombine in ways that 
 
 ### SurrealDB-Inspired Record IDs
 
-Every record has a typed address: `type:slug` (e.g., `company:nvidia`, `country:united-states`, `edge:conflict:x::involves::country:y`).
+Every record has a typed address: `type:slug` (e.g., `company:nvidia`, `country:united-states`).
 
 ```typescript
 // @gambit/common
@@ -45,13 +45,17 @@ type RecordId = `${string}:${string}`;
 function recordId(type: string, slug: string): RecordId;
 function parseRecordId(id: RecordId): { type: string; slug: string };
 function edgeId(fromId: string, relation: string, toId: string): string;
+// edgeId output: "edge--conflict:x--involves--country:y" (double hyphens as separators)
 ```
 
-PostgreSQL enforces format via domain type:
+PostgreSQL enforces format via domain type on entity tables:
 
 ```sql
+-- Applied to entities.id, entity_edges.from_id, entity_edges.to_id
 CREATE DOMAIN record_id AS TEXT CHECK (VALUE ~ '^[a-z][a-z0-9-]*:[a-z0-9_-]+$');
 ```
+
+**Note:** `entity_edges.id` uses plain `TEXT`, not the `record_id` domain, because edge IDs have a different format (`edge--from--relation--to`) that includes the separator pattern.
 
 ### Declarative Edge Mappings
 
@@ -350,7 +354,7 @@ docker compose --profile all up           → everything
 
 - **Temporal has its own PostgreSQL** — prevents migration conflicts and connection pool contention with the app database
 - **Dual Redis** — cache (evictable) and persistent (durable counters/state)
-- **PgBouncer in transaction mode** — allows RLS `SET LOCAL` to work correctly within transactions
+- **PgBouncer in transaction mode** — `SET LOCAL` only survives within a single transaction. The `db-context` middleware wraps every authenticated request in a transaction that opens with `SET LOCAL app.team_id`, ensuring RLS enforcement persists for all queries within that request. This is critical: without the transaction wrapper, PgBouncer returns the connection to the pool between statements and the RLS context is lost. Every tenant-scoped database call MUST go through the transaction-scoped `c.get('db')`, never `container.db` directly
 - **Test PostgreSQL on tmpfs** — RAM-backed for fast test execution, data thrown away
 - **All services have healthchecks** — `depends_on` with `condition: service_healthy` prevents startup race conditions
 
@@ -367,7 +371,7 @@ docker compose --profile all up           → everything
 | `signals.ts` | sources, signals | Created empty (Phase 2) |
 | `analysis.ts` | gap_scores, alerts, watchlists, domain_taxonomy | Created empty (Phase 3) |
 | `memory.ts` | memory_tokens, memory_token_versions, extraction_samples | Created empty (Phase 2) |
-| `operations.ts` | pipeline_runs, signal_dlq, usage_records, webhook_deliveries | Created empty (Phase 2) |
+| `operations.ts` | pipeline_runs, signal_dlq, sync_dlq, usage_records, webhook_deliveries | Created empty except sync_dlq (active in Phase 1) |
 | `foia.ts` | foia_agencies, foia_requests | Created empty (Phase 5) |
 | `analytics.ts` | search_analytics | Active (Phase 1) |
 
@@ -384,7 +388,7 @@ teamTierEnum: free, pro, enterprise
 userRoleEnum: owner, admin, member, viewer
 alertSeverityEnum: info, warning, critical
 verificationEnum: unverified, verified, disputed, retracted, needs-review
-parserModeEnum: structured, agent, token, hybrid
+parserModeEnum: structured, agent, token, hybrid (new modes require `ALTER TYPE parser_mode ADD VALUE`)
 ```
 
 ### Entity Table
@@ -444,9 +448,9 @@ Run after migrations on every startup (idempotent):
 
 1. **Extensions:** `postgis`, `pg_trgm`
 2. **Triggers:** `updated_at` auto-update on all mutable tables
-3. **RLS policies:** on watchlists, alerts, foia_requests, usage_records, webhook_deliveries, api_keys, audit_log
+3. **RLS policies:** on watchlists, alerts, foia_requests, usage_records, webhook_deliveries, api_keys. **Note:** `audit_log` is global (admin-only access, no RLS) — system operations, seed operations, and admin actions write audit entries with `team_id = NULL`. The admin routes expose audit log without tenant filtering
 4. **Table comments:** documentation on every table and key column
-5. **Materialized view:** `entity_listing` for fast list queries (refreshed every 30s)
+5. **Materialized view:** `entity_listing` for fast list queries (refreshed concurrently every 30s). **Safety note:** materialized views bypass RLS — this is safe for `entity_listing` because entities are global shared data (all tenants see the same entities). Materialized views must NEVER be used for tenant-scoped tables (watchlists, alerts, etc.)
 
 ### Audit Log
 
@@ -584,6 +588,8 @@ Seed is idempotent — uses `onConflictDoUpdate` for entities, `onConflictDoNoth
 
 ### Architecture
 
+**Phase 1 uses a native Change Stream process** — not a Temporal workflow. Temporal is in the `engine` Docker profile (not `core`), and the sync must work without it. In Phase 2, when Temporal is fully operational, the sync can optionally migrate to a Temporal workflow for enhanced durability and retry semantics. The parent spec's reference to "Change Stream listener (runs as a Temporal workflow)" is updated to reflect this phased approach.
+
 ```
 MongoDB (legacy writes via api/)
     │
@@ -687,14 +693,16 @@ Resolution aliases from multiple sources are deduplicated before indexing. Each 
 2. Connect PostgreSQL (fatal on failure)
 3. Run database init (extensions, triggers, RLS, materialized views)
 4. Connect optional services (Typesense, ClickHouse, Temporal, MinIO, Redis ×2)
-5. Configure Typesense synonyms
-6. Create MinIO buckets
-7. Build service container (DI)
-8. Connect MongoDB (for sync)
-9. Start Change Stream sync
+5. Connect MongoDB (for sync — non-fatal if unavailable, sync disabled)
+6. Configure Typesense synonyms
+7. Create MinIO buckets
+8. Build service container (DI) — all connections available
+9. Start Change Stream sync (if MongoDB connected)
 10. Run self-check (verify all services functional)
 11. Start HTTP server
 ```
+
+**Note:** MongoDB is connected before the service container is built so `sync` is available when the container is constructed. If MongoDB is unavailable, the engine starts without sync — entity data is still served from PostgreSQL (seeded data), but changes made via the legacy API won't propagate until MongoDB reconnects.
 
 ### Middleware Stack (ordered)
 
@@ -719,7 +727,7 @@ Resolution aliases from multiple sources are deduplicated before indexing. Each 
 
 ```
 GET    /engine/v1/entities                — list (cursor pagination, filters, Typesense search)
-GET    /engine/v1/entities/:id            — detail (with ?include=edges,scores)
+GET    /engine/v1/entities/:id            — detail (with ?include=edges; ?include=scores returns null until Phase 3)
 POST   /engine/v1/entities/resolve        — entity resolution (name → ID)
 POST   /engine/v1/entities/batch          — bulk fetch by IDs (max 100)
 GET    /engine/v1/entities/:id/edges      — relationships (filterable by relation, direction)
@@ -838,6 +846,47 @@ Service layer designed so `db` parameter can point to a read replica for list/se
 ---
 
 ## 10. Forward References (Phase 2-5)
+
+### Phase 1 Deliverable: ClickHouse Schema Initialization
+
+Phase 1 creates the ClickHouse tables (empty) so Phase 2 doesn't need to figure out initialization:
+
+```sql
+-- ClickHouse tables (created in Phase 1, populated in Phase 2+)
+
+CREATE TABLE IF NOT EXISTS signal_analytics (
+  entity_id String,
+  source_id String,
+  polarity Enum8('declarative' = 0, 'behavioral' = 1),
+  category String,
+  tier UInt8,
+  domains Array(String),
+  intensity Float32,
+  confidence Float32,
+  published_at DateTime64(3),
+  ingested_at DateTime64(3),
+  content_hash String
+) ENGINE = MergeTree()
+ORDER BY (entity_id, polarity, published_at)
+PARTITION BY toYYYYMM(published_at);
+
+CREATE TABLE IF NOT EXISTS gap_score_history (
+  entity_id String,
+  domain String,
+  alignment Float64,
+  reality_score Float64,
+  category String,
+  behavioral_count UInt32,
+  behavioral_weighted Float64,
+  declarative_count UInt32,
+  declarative_weighted Float64,
+  computed_at DateTime64(3)
+) ENGINE = MergeTree()
+ORDER BY (entity_id, domain, computed_at)
+PARTITION BY toYYYYMM(computed_at);
+```
+
+Data flows to ClickHouse via direct application writes from Temporal activities (Phase 2+), not logical replication. PostgreSQL `gap_scores` holds the current state; ClickHouse `gap_score_history` holds all historical snapshots for time-series analysis.
 
 ### Phase 2: Ingestion Framework
 - Temporal workflow pipeline: fetch → parse → classify → resolve → write
