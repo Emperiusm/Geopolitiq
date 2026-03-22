@@ -19,6 +19,9 @@
 11. [FOIA Intelligence System](#11-foia-intelligence-system)
 12. [Migration Path](#12-migration-path)
 13. [Tiering & Packaging](#13-tiering--packaging)
+14. [Multi-Tenancy & Security](#14-multi-tenancy--security)
+15. [Reality Score Normalization](#15-reality-score-normalization)
+16. [Migration Synchronization Strategy](#16-migration-synchronization-strategy)
 
 ---
 
@@ -127,7 +130,7 @@ temporal-ui:
 
 clickhouse:
   image: clickhouse/clickhouse-server:latest
-  ports: ["8123:8123", "9000:9000"]
+  ports: ["8123:8123", "9100:9000"]
 
 typesense:
   image: typesense/typesense:27.1
@@ -166,7 +169,7 @@ CREATE TABLE entities (
   name TEXT NOT NULL,
   aliases TEXT[] DEFAULT '{}',
   parent_id TEXT REFERENCES entities(id),
-  child_ids TEXT[] DEFAULT '{}',
+  -- child_ids derived via: SELECT id FROM entities WHERE parent_id = $1
   status TEXT DEFAULT 'active',           -- active, acquired, dissolved, merged, inactive
   status_detail TEXT,
   status_at TIMESTAMPTZ,
@@ -197,6 +200,9 @@ CREATE TABLE resolution_aliases (
   confidence NUMERIC DEFAULT 0.5,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX idx_resolution_aliases_alias ON resolution_aliases(alias);
+CREATE INDEX idx_resolution_aliases_entity ON resolution_aliases(entity_id);
 
 CREATE TABLE resolution_feedback (
   id SERIAL PRIMARY KEY,
@@ -1316,7 +1322,7 @@ CREATE TABLE foia_requests (
 
   priority INT DEFAULT 50,
   expected_value TEXT,                    -- high, medium, low
-  trigger_signal_id TEXT,
+  trigger_signal_id TEXT REFERENCES signals(id) ON DELETE SET NULL,
 
   status TEXT DEFAULT 'draft',            -- draft, filed, acknowledged, processing,
                                           -- fee-estimate, completed, appealed, litigated
@@ -1480,3 +1486,216 @@ X-Usage-Tier: pro
 ```
 
 Usage tracked in Redis for real-time enforcement, PostgreSQL for billing history.
+
+---
+
+## 14. Multi-Tenancy & Security
+
+### Auth Schema (PostgreSQL)
+
+```sql
+CREATE TABLE teams (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  tier TEXT NOT NULL DEFAULT 'free',      -- free, pro, enterprise
+  stripe_customer_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  team_id TEXT NOT NULL REFERENCES teams(id),
+  role TEXT NOT NULL DEFAULT 'member',    -- admin, member, viewer
+  providers JSONB DEFAULT '[]',
+  deleted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE api_keys (
+  id TEXT PRIMARY KEY,
+  key_hash TEXT NOT NULL UNIQUE,
+  team_id TEXT NOT NULL REFERENCES teams(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL,
+  scopes TEXT[] DEFAULT '{}',
+  last_used_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Tenant Isolation Model
+
+Entities, signals, sources, gap scores, and domain taxonomy are **shared global data** — all tenants see the same intelligence. This is the product: Gambit ingests and analyzes data for everyone.
+
+Tenant-scoped data (private to each team):
+
+| Table | Isolation | Mechanism |
+|---|---|---|
+| `watchlists` | Per team | `team_id` FK + query filter |
+| `alerts` | Per team (via watchlist) | `team_id` FK + query filter |
+| `foia_requests` | Per team | `team_id` FK + query filter |
+| `usage_records` | Per team | `team_id` FK + query filter |
+| `webhook_deliveries` | Per team | `team_id` FK + query filter |
+| `api_keys` | Per team | `team_id` FK |
+| `users` | Per team | `team_id` FK |
+
+PostgreSQL Row Level Security (RLS) enforces isolation on tenant-scoped tables:
+
+```sql
+ALTER TABLE watchlists ENABLE ROW LEVEL SECURITY;
+CREATE POLICY watchlists_team_isolation ON watchlists
+  USING (team_id = current_setting('app.current_team_id'));
+
+-- Applied to all tenant-scoped tables
+```
+
+The API middleware sets `app.current_team_id` from the authenticated API key or JWT before each request.
+
+### Tier Enforcement
+
+Tier limits are enforced at two levels:
+
+1. **API middleware** — checks Redis usage counter (`gambit:usage:{teamId}:{date}`) against team tier limits before processing request
+2. **Service layer** — `WatchlistService` checks `team.tier` before allowing creation beyond limit, `FOIAService` checks monthly allowance
+
+### Secrets Management
+
+Source credentials (`fetcher_auth.keyRef`) resolve to environment variables or a secrets store:
+
+```typescript
+// keyRef format: "env:USPTO_API_KEY" or "vault:source/uspto/api-key"
+async function resolveSecret(keyRef: string): Promise<string> {
+  if (keyRef.startsWith('env:')) return process.env[keyRef.slice(4)]!;
+  if (keyRef.startsWith('vault:')) return vault.read(keyRef.slice(6));
+  throw new Error(`Unknown keyRef format: ${keyRef}`);
+}
+```
+
+- **Development:** `env:` prefix, secrets in `.env` file
+- **Production:** HashiCorp Vault or cloud-native secrets manager (AWS Secrets Manager, GCP Secret Manager)
+- **Never** stored as plaintext in the `sources` table — only the `keyRef` pointer
+
+---
+
+## 15. Reality Score Normalization
+
+The normalization function converts raw alignment + metadata into a 0-100 score:
+
+```typescript
+function normalizeRealityScore(
+  alignment: number,
+  behavioralCount: number,
+  declarativeCount: number,
+  verificationRatio: number,   // verified signals / total signals
+  signalDensity: number,       // signals per month
+): number {
+  const totalSignals = behavioralCount + declarativeCount;
+
+  // Base score from alignment (sigmoid mapping)
+  // alignment 1.0 → 75, alignment 0.0 → 15, alignment 2.0+ → 90+
+  let base: number;
+  if (declarativeCount === 0 && behavioralCount > 0) {
+    base = 85; // stealth: high behavioral, unknown declarative
+  } else if (behavioralCount === 0 && declarativeCount > 0) {
+    base = 15; // pure vaporware
+  } else {
+    // Sigmoid centered at alignment=1.0, mapped to 30-95 range
+    const x = Math.log(alignment); // ln(1.0) = 0, ln(0.5) = -0.69, ln(2.0) = 0.69
+    base = 62.5 + 32.5 * Math.tanh(x * 1.5);
+  }
+
+  // Confidence multiplier: more signals = more confident in the score
+  // Caps at 1.0 above 50 signals, scales linearly below
+  const signalConfidence = Math.min(1.0, totalSignals / 50);
+
+  // Verification bonus: verified signals boost score reliability
+  // Up to +5 points for fully verified corpus
+  const verificationBonus = verificationRatio * 5;
+
+  // Final score
+  const raw = base * signalConfidence + verificationBonus;
+  return Math.round(Math.max(0, Math.min(100, raw)));
+}
+```
+
+**Confidence interval** computed from signal count:
+
+```typescript
+function computeConfidenceInterval(
+  realityScore: number,
+  totalSignals: number,
+): [number, number] {
+  // Margin of error decreases with more signals (√n relationship)
+  const margin = Math.round(30 / Math.sqrt(Math.max(1, totalSignals)));
+  return [
+    Math.max(0, realityScore - margin),
+    Math.min(100, realityScore + margin),
+  ];
+  // 5 signals → ±13, 25 signals → ±6, 100 signals → ±3
+}
+```
+
+---
+
+## 16. Migration Synchronization Strategy
+
+During the transition from MongoDB to PostgreSQL, data must be consistent across both stores.
+
+### Approach: MongoDB Change Streams → PostgreSQL Sync
+
+```
+MongoDB (existing source of truth for legacy collections)
+    │
+    ├── Change Stream listener (runs as a Temporal workflow)
+    │   └── On insert/update/delete in legacy collections:
+    │       1. Map document to unified entity schema
+    │       2. Upsert into PostgreSQL entities table
+    │       3. Update Typesense search index
+    │       4. Log sync event for monitoring
+    │
+    └── /api/v1/ routes continue reading from MongoDB (unchanged)
+
+PostgreSQL (source of truth for ALL new data)
+    │
+    ├── /engine/v1/ routes read from PostgreSQL
+    └── Signal dashboard reads from /engine/v1/
+```
+
+### Sync Rules
+
+- **Legacy entity types** (countries, conflicts, bases, chokepoints, nsa, elections, trade-routes, ports): MongoDB → PostgreSQL sync via Change Streams. MongoDB remains writable; PostgreSQL is a read replica for engine queries.
+- **New entity types** (companies, organizations, persons): created directly in PostgreSQL. Never exist in MongoDB.
+- **Signals, gap scores, alerts, watchlists, FOIA**: PostgreSQL only from day one. Never in MongoDB.
+- **Cutover per entity type**: when an entity type's `/api/v1/` route is migrated to `/engine/v1/`, PostgreSQL becomes the writable source of truth for that type. The Change Stream sync direction reverses (PostgreSQL → MongoDB) for any remaining legacy consumers, then MongoDB collection is deprecated.
+
+### Gap Score Storage Clarification
+
+- `gap_scores` (current state) → PostgreSQL. The API reads current scores from PostgreSQL for entity detail views.
+- `gap_score_history` (time-series) → ClickHouse. The API reads historical scores from ClickHouse for sparklines, trend analysis, and leaderboard ranking.
+- Gap analysis Temporal workflow writes to both: current score upsert to PostgreSQL, historical snapshot append to ClickHouse.
+- Leaderboard queries run against ClickHouse (aggregation-heavy, sorted by score with filtering).
+
+### Redis Clarification
+
+- **Development:** self-hosted Redis via Docker (existing container continues). Upstash Redis SDK used with local Redis connection string.
+- **Production:** Upstash Redis (managed, HTTP-based). For SSE pub/sub, use Upstash's native pub/sub support via the `@upstash/redis` client.
+- The Upstash Redis client library supports both self-hosted Redis and Upstash cloud — same API, different connection string.
+
+### Domain Decay Rate Precedence
+
+When computing signal weight, decay rates are resolved in order:
+1. Domain-specific `decay_rate` on `domain_taxonomy` (if set, overrides category default)
+2. Category-specific rate from `DECAY_RATES` map
+3. Default rate: `0.005` (half-life ~139 days)
