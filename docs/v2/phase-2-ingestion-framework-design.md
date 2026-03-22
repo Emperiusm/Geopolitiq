@@ -274,6 +274,17 @@ Pre-sanitization: strip XML/HTML processing instructions, truncate to `parser_ma
 
 `parser_model TEXT` on the sources table (e.g., `'claude-haiku-4-5'`, `'claude-sonnet-4-6'`). The agent activity routes to the configured model. Default: cheapest capable model. Cost tracking (`cost_per_signal`) makes model upgrade ROI visible.
 
+### Routed Parser Mode
+
+For sources with heterogeneous document types (e.g., SEC EDGAR with 10-K, 8-K, Form 4), the `ParseActivity` supports a fourth routing mode via `parser_routing JSONB` on the source config. When `parser_routing` is present, the activity:
+
+1. Extracts a routing key from the fetched document (e.g., filing type from EDGAR metadata)
+2. Looks up the key in `parser_routing` to find mode, parser_ref, and model for that document type
+3. Falls back to the `_default` entry for unrecognized document types
+4. Dispatches to the appropriate parser mode (structured/agent/hybrid) with the per-type config
+
+This allows a single source config to handle many document types with different parsing strategies, avoiding source-per-type proliferation.
+
 ### Hybrid Mode Flow
 
 1. Run structured parser
@@ -915,8 +926,8 @@ Migrated from existing `feed-registry.ts`. 150+ feeds across geopolitical, finan
 
 #### 4. SEC EDGAR
 
-- **Fetcher:** EDGAR full-text search API + XBRL companion API. 10 req/s with User-Agent header.
-- **Architecture:** Filing type router — single source config with `parser_routing` map:
+- **Fetcher:** Two source configs with dependency chain. `source:sec-edgar-index` fetches the daily filing index (`fetcher_type = 'api'`, `pagination = 'cursor'`). `source:sec-edgar-filings` depends on it via `dependencies: [{sourceId: 'source:sec-edgar-index', requirement: 'provides-input'}]` — receives the filing URLs as input and fetches individual documents. 10 req/s with User-Agent header required by SEC policy.
+- **Architecture:** Filing type router on `source:sec-edgar-filings` — single source config with `parser_routing` map (see Section 5, Routed Parser Mode):
 
 ```json
 {
@@ -1215,6 +1226,17 @@ ALTER TABLE signals ADD COLUMN corroboration_count INT DEFAULT 0;
 
 -- entities table additions
 ALTER TABLE entities ADD COLUMN version INT DEFAULT 1;
+
+-- pipeline_runs table additions (new stage counters beyond Phase 1)
+ALTER TABLE pipeline_runs ADD COLUMN deduplicated INT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN classified INT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN resolved INT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN graphed INT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN published INT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN dlqd INT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN cost_tokens_in BIGINT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN cost_tokens_out BIGINT DEFAULT 0;
+ALTER TABLE pipeline_runs ADD COLUMN cost_estimated_usd NUMERIC DEFAULT 0;
 ```
 
 ### ClickHouse Tables
