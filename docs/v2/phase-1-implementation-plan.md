@@ -10,6 +10,23 @@
 
 **Design spec:** `docs/v2/phase-1-engine-foundation.md`
 
+**Status:** ✅ Complete — 10/10 tasks implemented, 86 files, 6,777 lines. Branch: `feature/phase-1-engine-foundation`
+
+---
+
+## Table of Contents
+
+- [x] [Task 1: Workspace Setup & Shared Package Scaffold](#task-1-workspace-setup--shared-package-scaffold) — `030c559`
+- [x] [Task 2: Shared Package — Record IDs, Types, Config, Errors, Logger](#task-2-shared-package--record-ids-types-config-errors-logger) — `942f450`
+- [x] [Task 3: Docker Compose Infrastructure](#task-3-docker-compose-infrastructure) — `7345375`
+- [x] [Task 4: Drizzle Schema & Database Init](#task-4-drizzle-schema--database-init) — `16feabb`
+- [x] [Task 5: Infrastructure Connections (Typesense, ClickHouse, MinIO, Temporal, Redis, Health)](#task-5-infrastructure-connections-typesense-clickhouse-minio-temporal-redis-health) — `a5322b2`
+- [x] [Task 6: Entity Seed from MongoDB](#task-6-entity-seed-from-mongodb) — `fec5299`
+- [x] [Task 7: Service Layer & Entity Routes](#task-7-service-layer--entity-routes) — `d47a28e`
+- [x] [Task 8: Engine Server Startup & Integration](#task-8-engine-server-startup--integration) — `9269d44`
+- [x] [Task 9: Change Stream Sync](#task-9-change-stream-sync) — `5e4cd8d`
+- [x] [Task 10: Test Infrastructure & Final Verification](#task-10-test-infrastructure--final-verification) — `45766e2`
+
 ---
 
 ## File Map
