@@ -15,7 +15,7 @@ Replace the minimal static `ArcLayer` in `trade-routes.ts` with a fully interact
 ## Visual Direction
 
 **B + C combined:**
-- **Risk Glow (B):** Arc color encodes disruption status. Disrupted routes pulse red; active routes are teal. A wide transparent halo behind each arc simulates a glow bloom (no CSS animation — static, GPU-rendered).
+- **Risk Glow (B):** Arc color encodes disruption status. Disrupted routes are red; active routes are teal. A wide transparent halo behind each arc simulates a glow bloom (static, GPU-rendered — no CSS or rAF animation).
 - **Select-to-Highlight (C):** Ports are the primary visible markers. All routes render at low opacity until a route or port is clicked. Selected route goes full cyan; all others dim to 15%.
 
 **Port-to-port arcs (Approach A):** One great-circle arc per route from source port to destination port. Chokepoint waypoints are hidden by default and appear as amber markers only on the selected route (unless the Chokepoints layer is already on, in which case the waypoint sub-layer is skipped to avoid double-rendering).
@@ -29,145 +29,210 @@ Replace the minimal static `ArcLayer` in `trade-routes.ts` with a fully interact
 Bootstrap already returns all required data:
 
 ```ts
-bootstrapData.value.tradeRoutes[]  // { _id, name, from, to, category, status, volumeDesc, waypoints[] }
-bootstrapData.value.ports[]        // { _id, name, lat, lng }
+bootstrapData.value.tradeRoutes[]  // { _id, name, from, to, category, status, volumeDesc, waypoints: string[] }
+bootstrapData.value.ports[]        // { _id, name, lat, lng, country }
 bootstrapData.value.chokepoints[]  // { _id, name, lat, lng, status }
 ```
+
+**Bootstrap ports projection must be widened** to include `country`. Update `SLIM_PROJECTIONS.ports` in `bootstrap.ts` from `{ _id: 1, name: 1, lat: 1, lng: 1 }` to `{ _id: 1, name: 1, lat: 1, lng: 1, country: 1 }`. This adds one small string field per port (37 ports).
+
+> **Cache invalidation:** The bootstrap response is cached in Redis under `gambit:bootstrap:slim` for 3600 seconds. After deploying this projection change, flush that key (`DEL gambit:bootstrap:slim` via redis-cli or the admin panel) so the `country` field is visible immediately rather than after the TTL expires.
+
+**Trade route `_id`** is the human-readable string id (e.g. `"china-europe-suez"`), not a MongoDB ObjectId — this is how all reference collections are seeded in Gambit. Selection comparisons use this string directly.
+
+**Waypoint IDs** stored in MongoDB are already normalized short-form strings (`"malacca"`, `"suez"`, `"bab-el-mandeb"`, etc.) via `normalizeWaypointId()` at seed time. These match `chokepoint._id` directly — no additional transformation needed in the resolver.
 
 ### Field Mismatch Fix
 
 The existing `TradeRoute` frontend interface uses different field names from the seed data. The resolver remaps at runtime:
 
-| Seed field | Interface field | Notes |
+| Seed field | Resolved to | Notes |
 |---|---|---|
-| `from` | `source` | Port ID → port name via lookup |
-| `to` | `destination` | Port ID → port name via lookup |
-| `volumeDesc` | displayed directly | Replaces broken `volumePerDay` |
+| `from` | `source` | Resolved to port `name` string via port lookup |
+| `to` | `destination` | Resolved to port `name` string via port lookup |
+| `volumeDesc` | displayed directly | Replaces broken `volumePerDay` / `volumeUnit` |
 | `status: 'disrupted'` | `disruptionRisk: 'high'` | Mapped in resolver |
 | `status: 'active'` | `disruptionRisk: 'low'` | Mapped in resolver |
+| any other `status` | `disruptionRisk: 'low'` | Fallback — treated as active |
 
 ### Resolved Structures
 
-`resolveTradeArcs(tradeRoutes, ports, chokepoints)` runs once on bootstrap load (pure in-memory join, <1ms for 21 routes):
+`resolveTradeArcs(tradeRoutes, ports, chokepoints)` runs **once on bootstrap load**, not in the render loop. It should be called inside a `useEffect` (or equivalent) that watches `bootstrapData` and stores results in a ref or signal. This is a pure in-memory join (<1ms for 21 routes) that produces stable objects until bootstrap refreshes.
 
 ```ts
 interface ResolvedArc {
-  route: any;           // full original route doc
+  route: any;           // full original route doc with remapped fields (source, destination, disruptionRisk)
+  fromPortId: string;   // port._id — used for port card route-list filtering
+  toPortId: string;     // port._id
   fromLng: number;
   fromLat: number;
   toLng: number;
   toLat: number;
+  label: string;        // pre-formatted tooltip string: "${name} · ${status} · ${volumeDesc}"
   color: [number, number, number, number];  // RGBA risk color
   width: number;        // by category
 }
 
 interface ResolvedPort {
-  id: string;
+  _id: string;          // matches port._id from bootstrap (e.g. "shanghai")
   name: string;
   lng: number;
   lat: number;
-  routeIds: string[];   // all routes this port appears in
+  country: string;
+  routeIds: string[];   // _ids of all routes this port appears in as from/to
 }
 
-// waypointsByRoute: Map<routeId, { id, name, lng, lat, status }[]>
+// waypointsByRoute: Map<routeId, { _id: string; name: string; lng: number; lat: number; status: string }[]>
+// Built by matching tradeRoute.waypoints[i] === chokepoint._id (direct string equality)
+// Waypoint IDs with no matching chokepoint are silently skipped
 ```
 
 **Color encoding:**
 - `status === 'disrupted'` → `[255, 64, 88, 220]` red
-- `status === 'active'` → `[20, 184, 166, 180]` teal
+- `status === 'active'` (or unknown) → `[20, 184, 166, 180]` teal
 
 **Width by category:**
-- `container` → 2.5px
-- `energy` → 2.0px
-- `bulk` → 1.5px
+- `container` → 2.5
+- `energy` → 2.0
+- `bulk` → 1.5
+- unknown → 1.5 (fallback)
 
-Routes with unresolvable `from` or `to` (port not in ports collection) are silently skipped.
+Routes with unresolvable `from` or `to` (port `_id` not found in ports collection) are silently skipped.
+
+> **Data quality note:** Several routes have geographic labelling issues in the seed (e.g. "Australia -> East Asia" uses Richards Bay, South Africa as the origin; "Nigeria -> Europe" uses Mombasa, Kenya). These are content errors not code bugs — they will render correctly as long as the port IDs resolve. The waypoint `"taiwan"` used by `intra-asia-container` has no matching chokepoint and will be silently skipped.
 
 ---
 
 ## Layer Architecture
 
-`createTradeRoutesLayer(arcs, ports, waypointsByRoute, selectedId, onSelectRoute, onSelectPort, visible, showChokepoints)` returns an array of 4 Deck.GL layers.
+```ts
+createTradeRoutesLayer(
+  arcs: ResolvedArc[],             // pre-filtered by tradeRouteFilter
+  allArcs: ResolvedArc[],          // full unfiltered list (for port card route list)
+  ports: ResolvedPort[],           // ports referenced by arcs
+  waypointsByRoute: Map<string, WaypointData[]>,
+  selectedRouteId: string | null,
+  selectedPortId: string | null,
+  onSelectRoute: (route: any) => void,
+  onSelectPort: (port: ResolvedPort) => void,
+  visible: boolean,
+  showChokepoints: boolean,
+): Layer[]
+```
+
+Returns an array of **5 Deck.GL layers**. All `get*` functions use per-datum accessor form `(d) => ...`.
 
 ### Layer 1 — Glow Halo (`ArcLayer`)
 ```
 id: 'trade-routes-glow'
-getWidth: width * 5
-opacity: disrupted ? 0.12 : 0.06
-getSourceColor / getTargetColor: route color
+data: arcs
+getWidth: (d) => d.width * 5
+getSourceColor: (d) => [...d.color.slice(0,3), d.route.status === 'disrupted' ? 30 : 15]
+getTargetColor: same as getSourceColor
 greatCircle: true
-updateTriggers: { getSourceColor: [selectedId], getTargetColor: [selectedId] }
 pickable: false
+updateTriggers: { getSourceColor: [selectedRouteId], getTargetColor: [selectedRouteId] }
 ```
 
 ### Layer 2 — Core Arc (`ArcLayer`)
 ```
 id: 'trade-routes-core'
-getWidth: route width
-getSourceColor / getTargetColor:
-  - if nothing selected: route color
-  - if selectedId matches: [0, 229, 204, 255]  cyan
-  - if selectedId set but no match: route color at 15% opacity
+data: arcs
+getWidth: (d) => d.width
+getSourceColor: (d) =>
+  selectedRouteId === null         ? d.color
+  selectedRouteId === d.route._id  ? [0, 229, 204, 255]        // cyan
+  otherwise                        : [...d.color.slice(0,3), 38]  // ~15% opacity
+getTargetColor: same logic as getSourceColor
 greatCircle: true
 pickable: true
-onClick: (info) => onSelectRoute(info.object.route)
-onHover: (info) => show tooltip (name, status, volumeDesc)
-updateTriggers: { getSourceColor: [selectedId], getTargetColor: [selectedId], getWidth: [selectedId] }
+onClick: (info) => info.object && onSelectRoute(info.object.route)
+onHover: drives tooltip — see Hover Tooltip below
+updateTriggers: { getSourceColor: [selectedRouteId], getTargetColor: [selectedRouteId] }
 ```
 
-### Layer 3 — Port Markers (`ScatterplotLayer`)
+### Layer 3 — Port Markers, unselected (`ScatterplotLayer`)
 ```
 id: 'trade-routes-ports'
-data: resolved ports (only those appearing in visible + filtered routes)
-getPosition: [lng, lat]
-getFillColor:
-  - selected route's ports: [0, 229, 204, 255]
-  - other ports (nothing selected): [20, 184, 166, 180]
-  - other ports (something selected): [20, 184, 166, 50]
-getRadius: selected port → 120000, others → 80000
-radiusMinPixels: selected → 7, others → 4
-radiusMaxPixels: 18
+data: ports (excluding the currently selected port)
+getPosition: (d) => [d.lng, d.lat]
+getFillColor: (d) =>
+  selectedRouteId set and d._id in selected route's from/to → [0, 229, 204, 255]
+  nothing selected → [20, 184, 166, 180]
+  something selected and this port is not an endpoint → [20, 184, 166, 50]
+getRadius: () => 80000
+radiusMinPixels: 4
+radiusMaxPixels: 14
 pickable: true
-onClick: (info) => onSelectPort(info.object)
-updateTriggers: { getFillColor: [selectedId], getRadius: [selectedId] }
+onClick: (info) => info.object && onSelectPort(info.object)
+updateTriggers: { getFillColor: [selectedRouteId, selectedPortId], data: [selectedPortId] }
 ```
 
-### Layer 4 — Waypoints (`ScatterplotLayer`)
+### Layer 4 — Port Marker, selected (`ScatterplotLayer`)
+```
+id: 'trade-routes-port-selected'
+data: selectedPortId ? [ports.find(p => p._id === selectedPortId)] : []
+getPosition: (d) => [d.lng, d.lat]
+getFillColor: () => [0, 229, 204, 255]
+getRadius: () => 120000
+radiusMinPixels: 7
+radiusMaxPixels: 18
+pickable: false
+updateTriggers: { data: [selectedPortId] }
+```
+
+> Layers 3 and 4 are split so that `radiusMinPixels` (a scalar layer prop, not per-datum) can differ between selected and unselected ports.
+
+### Layer 5 — Waypoints (`ScatterplotLayer`)
 ```
 id: 'trade-routes-waypoints'
-data: waypointsByRoute.get(selectedId) ?? []
-visible: selectedId !== null && !showChokepoints
-getPosition: [lng, lat]
-getFillColor: [255, 176, 32, 220]  amber
-getRadius: 90000
+data: waypointsByRoute.get(selectedRouteId) ?? []
+visible: selectedRouteId !== null && !showChokepoints
+getPosition: (d) => [d.lng, d.lat]
+getFillColor: () => [255, 176, 32, 220]   amber
+getRadius: () => 90000
 radiusMinPixels: 5
 radiusMaxPixels: 14
 pickable: false
 ```
 
-> **Note:** Layer 4 is suppressed (`visible: false`) when the Chokepoints layer is on, preventing double-rendering of the same chokepoint markers.
+> Layer 5 is suppressed when the Chokepoints layer is on (`showChokepoints: true`), preventing double-rendering of the same chokepoint markers.
+
+### Hover Tooltip
+
+The existing `onHover` handler in deck-map reads `info.object.name ?? info.object.title ?? info.object.label ?? info.layer.id`. `ResolvedArc` has none of these fields by default, so the `label` field is added to `ResolvedArc` (see above) with the pre-formatted string. No changes to deck-map's `onHover` handler are needed — it will pick up `d.label` automatically.
 
 ---
 
 ## State
 
-Two new signals added to `src/state/store.ts`:
+**One new file to add** to the bootstrap projection. Three new signals added to `src/state/store.ts`:
 
 ```ts
 export const selectedTradeRoute = signal<any | null>(null);
+export const selectedPort = signal<ResolvedPort | null>(null);
 export const tradeRouteFilter = signal<Set<'energy' | 'container' | 'bulk'>>(
   new Set(['energy', 'container', 'bulk'])  // all on by default
 );
 ```
 
-`selectedTradeRoute` is independent of `selectedCountry` — they do not clear each other.
+`selectedTradeRoute` and `selectedCountry` are independent — they do not clear each other.
+`selectedTradeRoute` and `selectedPort` are mutually exclusive — selecting one clears the other.
 
 ### Actions
 ```ts
 export function selectTradeRoute(route: any | null) {
   selectedTradeRoute.value = route;
+  selectedPort.value = null;
+}
+
+export function selectPort(port: ResolvedPort | null) {
+  selectedPort.value = port;
+  selectedTradeRoute.value = null;
 }
 ```
+
+**Layer toggle side-effect:** Update the `toggleLayer()` action so that toggling `tradeRoutes` off also calls `selectTradeRoute(null)` and `selectPort(null)`.
 
 ---
 
@@ -175,34 +240,58 @@ export function selectTradeRoute(route: any | null) {
 
 | User action | Result |
 |---|---|
-| Hover arc | Tooltip appears: route name + status badge + volumeDesc |
-| Click arc | `selectTradeRoute(route)` → floating card opens |
-| Click port marker | Highlights all routes through that port; floating card shows port name + route list |
-| Click empty globe | `selectTradeRoute(null)` → card closes, all routes return to default opacity |
-| Layer toggle off | All 4 sub-layers hidden; `selectedTradeRoute` cleared |
+| Hover arc | DOM tooltip: `name · status · volumeDesc` |
+| Click arc | `selectTradeRoute(route)` → floating card shows route view |
+| Click port marker | `selectPort(port)` → floating card shows port view; all routes through that port highlight |
+| Click empty globe | `selectTradeRoute(null)` + `selectPort(null)` → card closes |
+| Layer toggle off | All 5 sub-layers hidden; `selectedTradeRoute` and `selectedPort` cleared |
+
+**Click handling — layer vs deck level:**
+- Route and port selection (`onSelectRoute`, `onSelectPort`) are handled entirely at the **layer level** via per-layer `onClick` props on Layers 2 and 3. Deck.GL calls these before the deck-level handler.
+- The deck-map's central `onClick` handler handles **empty-canvas deselection** only. Its current guard `if (!info.object) return` should become:
+```ts
+if (!info.object) {
+  selectTradeRoute(null);
+  selectPort(null);
+  return;
+}
+```
+The existing `if (info.object)` branch is unchanged. No existing country/entity deselection logic lives in the `!info.object` path — it is currently just an early return.
 
 ---
 
 ## Floating Card
 
-`TradeRoutesPanel` is promoted from a plain display component to a draggable floating card, following the same pattern as `GraphExplorer`:
+`TradeRoutesPanel` is promoted from a plain display component to a draggable floating card, following the same pattern as `GraphExplorer`. It is **conditionally rendered** (not always mounted): shown only when `selectedTradeRoute.value !== null || selectedPort.value !== null`.
 
-- **Default position:** bottom-left (`{ x: 20, y: auto }`, above the timeline scrubber)
-- **Draggable** via header mousedown
-- **Close button** → `selectTradeRoute(null)`
-- **No resize** handle (fixed size, compact)
+**New component signature:**
+```ts
+interface TradeRoutesPanelProps {
+  route: any | null;            // set when a route is selected
+  port: ResolvedPort | null;    // set when a port is selected (mutually exclusive with route)
+  allArcs: ResolvedArc[];       // pre-filter full arc list — used to list routes through port
+  onClose: () => void;          // calls selectTradeRoute(null) + selectPort(null)
+  onSelectRoute: (route: any) => void;  // switches card from port view to route view
+}
+```
 
-**Card content (route selected):**
+- **Default position:** bottom-left `{ x: 20, y: 80 }`
+- **Draggable** via header mousedown (same pattern as GraphExplorer)
+- **Close button** → `onClose()`
+- **No resize** handle (fixed width 340px, height auto)
+
+**Card content — route selected (`route !== null`):**
 - Route name (large)
-- Source → Destination
-- Volume description
+- Source → Destination (resolved port names)
+- Volume description (`volumeDesc`)
 - Category badge + Disruption risk badge
-- Waypoints list: chokepoint names with their current status
+- Waypoints list: chokepoint names with status indicator
 
-**Card content (port selected):**
+**Card content — port selected (`port !== null`):**
 - Port name + country
-- List of routes through this port, each with status badge
-- Clicking a route in the list selects it
+- Routes through this port: derived from `allArcs.filter(a => a.fromPortId === port._id || a.toPortId === port._id)` — uses `fromPortId`/`toPortId` (the original port `_id` strings on `ResolvedArc`) and the **pre-filter** `allArcs` so routes in toggled-off categories still appear in the port summary
+- Each route listed with name + status badge
+- Clicking a route row calls `onSelectRoute(route)`
 
 ---
 
@@ -211,14 +300,14 @@ export function selectTradeRoute(route: any | null) {
 Two additions to the trade routes section in `layer-menu.tsx`:
 
 **1 — Disruption count badge**
-When trade routes are enabled and at least one disrupted route exists, show inline: `Trade Routes · 3 disrupted` in red. Count is derived from `bootstrapData.value.tradeRoutes` filtered by `tradeRouteFilter`.
+When trade routes are enabled, show inline: `Trade Routes · N disrupted` (red) when N > 0. Count is derived from the **resolved arcs array** (not raw `bootstrapData`), filtered by the current `tradeRouteFilter` — so the count exactly matches what is rendered on the globe.
 
 **2 — Category chips**
-Three toggle chips below the trade routes toggle row:
+Three toggle chips rendered below the trade routes toggle row, visible only when the toggle is on:
 ```
 [Energy]  [Container]  [Bulk]
 ```
-All on by default. Multi-select. Drives `tradeRouteFilter` signal. Arcs for filtered-out categories are excluded from all 4 sub-layers. Chips only visible when the trade routes toggle is on.
+All on by default. Multi-select. Drives `tradeRouteFilter` signal. When a category is toggled off, arcs of that category are excluded from `arcs` (but not `allArcs`) passed to the layer factory. At least one category must remain selected — prevent all-off state in the toggle handler.
 
 ---
 
@@ -226,12 +315,13 @@ All on by default. Multi-select. Drives `tradeRouteFilter` signal. Arcs for filt
 
 | File | Type | Description |
 |---|---|---|
-| `src/layers/trade-routes.ts` | Modify | Full rewrite — 4 sub-layers, resolved data, updateTriggers |
-| `src/layers/trade-routes-resolver.ts` | Create | `resolveTradeArcs()` utility — client-side data join |
-| `src/state/store.ts` | Modify | Add `selectedTradeRoute`, `tradeRouteFilter` signals + `selectTradeRoute()` action |
-| `src/panels/trade-routes-panel.tsx` | Modify | Promote to draggable floating card; add port-selected view |
-| `src/panels/layer-menu.tsx` | Modify | Category chips + disruption count badge |
-| Main deck-map component | Modify | Wire onClick/onHover callbacks; pass `selectedId` + `showChokepoints` to layer factory |
+| `src/layers/trade-routes.ts` | Modify | Full rewrite — 5 sub-layers, accessor functions, updateTriggers |
+| `src/layers/trade-routes-resolver.ts` | Create | `resolveTradeArcs()` utility — client-side data join, field remapping |
+| `src/state/store.ts` | Modify | Add `selectedTradeRoute`, `selectedPort`, `tradeRouteFilter` signals + `selectTradeRoute()`, `selectPort()` actions; update `toggleLayer()` to clear selections on trade routes toggle-off |
+| `src/panels/trade-routes-panel.tsx` | Modify | Promote to draggable floating card; new prop signature; route + port views |
+| `src/panels/layer-menu.tsx` | Modify | Category chips + disruption count badge (from resolved arcs) |
+| `api/src/modules/aggregate/bootstrap.ts` | Modify | Widen ports projection to include `country` field |
+| Main deck-map component | Modify | Call `resolveTradeArcs()` on bootstrap load (in `useEffect`/`useMemo`); pass `arcs`, `allArcs`, `ports`, `waypointsByRoute`, `selectedRouteId`, `selectedPortId`, `showChokepoints` to layer factory; restructure empty-canvas `onClick` guard to call `selectTradeRoute(null)` + `selectPort(null)` |
 
 ---
 
@@ -241,4 +331,3 @@ All on by default. Multi-select. Drives `tradeRouteFilter` signal. Arcs for filt
 - Historical route data / timeline scrubbing
 - Route editing or admin UI
 - News feed integration (surface related articles when route selected)
-- Backend changes of any kind
