@@ -211,8 +211,234 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
+  # ═══════════════════════════════════════════════════
+  # ENGINE INFRASTRUCTURE — Postgres, PgBouncer, Redis-persistent
+  # ═══════════════════════════════════════════════════
+
+  postgres:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: gambit
+      POSTGRES_PASSWORD: gambit
+      POSTGRES_DB: gambit
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gambit"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    ports:
+      - "6432:6432"
+    environment:
+      DATABASE_URL: postgres://gambit:gambit@postgres:5432/gambit
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis-persistent:
+    image: redis:7-alpine
+    ports:
+      - "6381:6379"
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction
+    volumes:
+      - redis_persistent_data:/data
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    profiles:
+      - dev
+      - engine
+      - all
+
+  # ═══════════════════════════════════════════════════
+  # ENGINE PROFILE — ClickHouse, Typesense, Temporal, MinIO
+  # ═══════════════════════════════════════════════════
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9100:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./docker/clickhouse/users.xml:/etc/clickhouse-server/users.d/gambit.xml
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  typesense:
+    image: typesense/typesense:27.1
+    ports:
+      - "8108:8108"
+    environment:
+      TYPESENSE_API_KEY: gambit-dev
+      TYPESENSE_DATA_DIR: /data
+    volumes:
+      - typesense_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8108/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  postgres-temporal:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - pg_temporal_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=postgresql
+      - POSTGRES_SEEDS=postgres-temporal
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+    depends_on:
+      postgres-temporal:
+        condition: service_healthy
+    profiles:
+      - engine
+      - all
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+    profiles:
+      - engine
+      - all
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: gambit
+      MINIO_ROOT_PASSWORD: gambit-dev
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  minio-init:
+    image: minio/mc:latest
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set gambit http://minio:9000 gambit gambit-dev;
+      mc mb --ignore-existing gambit/documents;
+      mc mb --ignore-existing gambit/exports;
+      mc mb --ignore-existing gambit/foia-responses;
+      mc mb --ignore-existing gambit/raw-payloads;
+      mc mb --ignore-existing gambit/token-embeddings;
+      "
+    depends_on:
+      - minio
+    profiles:
+      - engine
+      - all
+
+  # ═══════════════════════════════════════════════════
+  # OBSERVABILITY PROFILE — Tempo, Grafana
+  # ═══════════════════════════════════════════════════
+
+  tempo:
+    image: grafana/tempo:latest
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    profiles:
+      - observability
+      - all
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+    profiles:
+      - observability
+      - all
+
+  # ═══════════════════════════════════════════════════
+  # TEST PROFILE — isolated test databases
+  # ═══════════════════════════════════════════════════
+
+  postgres-test:
+    image: postgres:17
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: gambit_test
+      POSTGRES_PASSWORD: gambit_test
+      POSTGRES_DB: gambit_test
+    tmpfs: /var/lib/postgresql/data
+    profiles:
+      - test
+
 volumes:
   mongo-data:
   neo4j-data:
   neo4j-backups:
   ollama-models:
+  pgdata:
+  pg_temporal_data:
+  clickhouse_data:
+  typesense_data:
+  minio_data:
+  redis_persistent_data:
+  caddy_data:
+  grafana_data:

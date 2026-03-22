@@ -1,0 +1,11 @@
+node_modules
+.git
+.worktrees
+.firecrawl
+.playwright-mcp
+.superpowers
+*.tar.gz
+dist
+frontend/node_modules
+api/node_modules
+engine/node_modules

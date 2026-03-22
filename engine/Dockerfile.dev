@@ -1,0 +1,15 @@
+FROM oven/bun:1-alpine
+
+WORKDIR /app
+
+COPY package.json bun.lock ./
+COPY packages/common/package.json packages/common/
+COPY engine/package.json engine/
+
+RUN bun install
+
+COPY packages/common/ packages/common/
+COPY engine/ engine/
+
+WORKDIR /app/engine
+CMD ["bun", "--watch", "src/index.ts"]
