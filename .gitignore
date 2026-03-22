@@ -19,3 +19,7 @@ verify-*.png
 
 # Backup files
 *.bak
+
+# Engine artifacts
+engine/dist/
+engine/src/db/migrations/
