@@ -1,86 +1,223 @@
 import { h } from 'preact';
-
-export interface TradeRoute {
-  _id: string;
-  name: string;
-  source: string;
-  destination: string;
-  category: string;
-  volumePerDay: number;
-  volumeUnit: string;
-  disruptionRisk: 'low' | 'medium' | 'high' | 'critical';
-  relatedChokepoints: string[];
-}
+import { useRef, useCallback, useState } from 'preact/hooks';
+import type { ResolvedArc, ResolvedPort, WaypointData } from '../layers/trade-routes-resolver';
 
 interface TradeRoutesPanelProps {
-  route: TradeRoute;
+  route: any | null;
+  port: ResolvedPort | null;
+  allArcs: ResolvedArc[];
+  waypoints: WaypointData[];
+  onClose: () => void;
+  onSelectRoute: (route: any) => void;
 }
 
 const RISK_STYLES: Record<string, { bg: string; fg: string }> = {
-  low: { bg: 'var(--success-dim)', fg: 'var(--success)' },
-  medium: { bg: 'var(--warning-dim)', fg: 'var(--warning)' },
-  high: { bg: 'var(--danger-dim)', fg: 'var(--danger)' },
-  critical: { bg: 'var(--risk-catastrophic-bg)', fg: 'var(--risk-catastrophic)' },
+  low:  { bg: 'var(--success-dim)',          fg: 'var(--success)' },
+  high: { bg: 'var(--danger-dim)',           fg: 'var(--danger)' },
 };
 
-export function TradeRoutesPanel({ route }: TradeRoutesPanelProps) {
-  const risk = RISK_STYLES[route.disruptionRisk] || RISK_STYLES.low;
+const CATEGORY_COLORS: Record<string, string> = {
+  energy:    'var(--accent-amber)',
+  container: 'var(--accent-cyan)',
+  bulk:      'var(--text-secondary)',
+};
+
+export function TradeRoutesPanel({ route, port, allArcs, waypoints, onClose, onSelectRoute }: TradeRoutesPanelProps) {
+  const [pos, setPos] = useState({ x: 20, y: 80 });
+  const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const onHeaderMouseDown = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    dragging.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      setPos({
+        x: dragging.current.origX + ev.clientX - dragging.current.startX,
+        y: dragging.current.origY + ev.clientY - dragging.current.startY,
+      });
+    };
+    const onUp = () => {
+      dragging.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [pos]);
+
+  const panelStyle: h.JSX.CSSProperties = {
+    position: 'fixed',
+    left: pos.x,
+    top: pos.y,
+    width: 340,
+    zIndex: 'var(--z-panel)' as any,
+    background: 'var(--bg-glass)',
+    backdropFilter: 'blur(var(--glass-blur))',
+    border: '1px solid var(--border-subtle)',
+    borderRadius: 'var(--radius-lg)',
+    boxShadow: 'var(--glass-shadow)',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  };
+
+  const headerStyle: h.JSX.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 14px',
+    borderBottom: '1px solid var(--border-subtle)',
+    cursor: 'grab',
+    userSelect: 'none',
+    flexShrink: 0,
+  };
+
+  const bodyStyle: h.JSX.CSSProperties = {
+    padding: '14px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    overflowY: 'auto',
+  };
+
+  const Badge = ({ label, color }: { label: string; color: string }) => (
+    <span style={{
+      display: 'inline-block', padding: '2px 8px',
+      borderRadius: 'var(--radius-full)',
+      background: `${color}20`, color,
+      fontSize: 'var(--text-2xs)', fontWeight: 600,
+      fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
+    }}>
+      {label}
+    </span>
+  );
 
   return (
-    <div class="panel-glass" style={{ padding: '16px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Name */}
-      <div style={{ fontSize: 'var(--text-lg)', fontWeight: 600, color: 'var(--text-primary)' }}>
-        {route.name}
-      </div>
-
-      {/* Source / Destination */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{ flex: 1, padding: '10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '2px' }}>Source</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontWeight: 600 }}>{route.source}</div>
-        </div>
-        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-tertiary)' }}>&rarr;</span>
-        <div style={{ flex: 1, padding: '10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '2px' }}>Destination</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontWeight: 600 }}>{route.destination}</div>
-        </div>
-      </div>
-
-      {/* Stats grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-        <div style={{ padding: '10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)' }}>
-          <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '2px' }}>Category</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{route.category}</div>
-        </div>
-        <div style={{ padding: '10px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)' }}>
-          <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '2px' }}>Volume / Day</div>
-          <div class="mono" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontWeight: 600 }}>
-            {route.volumePerDay.toLocaleString()} {route.volumeUnit}
-          </div>
-        </div>
-      </div>
-
-      {/* Disruption Risk */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: risk.bg, borderRadius: 'var(--radius-sm)', border: `1px solid ${risk.fg}20` }}>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Disruption Risk</span>
-        <span style={{ fontSize: 'var(--text-2xs)', fontWeight: 600, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', color: risk.fg }}>
-          {route.disruptionRisk}
+    <div style={panelStyle}>
+      {/* Draggable header */}
+      <div style={headerStyle} onMouseDown={onHeaderMouseDown as any}>
+        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          {route ? 'Trade Route' : 'Port'}
         </span>
+        <button
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}
+        >
+          ✕
+        </button>
       </div>
 
-      {/* Related Chokepoints */}
-      {route.relatedChokepoints && route.relatedChokepoints.length > 0 && (
-        <div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>Related Chokepoints</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {route.relatedChokepoints.map((cp, i) => (
-              <span key={i} style={{ padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-cyan-dim)', color: 'var(--accent-cyan)', fontSize: 'var(--text-2xs)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
-                {cp}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <div style={bodyStyle}>
+        {route && (
+          <>
+            {/* Route name */}
+            <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {route.name}
+            </div>
+
+            {/* Source → Destination */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ flex: 1, padding: '8px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 2 }}>From</div>
+                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>{route.source}</div>
+              </div>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>→</span>
+              <div style={{ flex: 1, padding: '8px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 2 }}>To</div>
+                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>{route.destination}</div>
+              </div>
+            </div>
+
+            {/* Volume */}
+            {route.volumeDesc && (
+              <div style={{ padding: '8px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 2 }}>Volume</div>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{route.volumeDesc}</div>
+              </div>
+            )}
+
+            {/* Badges */}
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {route.category && (
+                <Badge label={route.category} color={CATEGORY_COLORS[route.category] ?? 'var(--text-secondary)'} />
+              )}
+              {route.disruptionRisk && (
+                <Badge
+                  label={route.disruptionRisk === 'high' ? 'Disrupted' : 'Active'}
+                  color={RISK_STYLES[route.disruptionRisk]?.fg ?? 'var(--text-secondary)'}
+                />
+              )}
+            </div>
+
+            {/* Waypoints */}
+            {waypoints.length > 0 && (
+              <div>
+                <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Chokepoints
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {waypoints.map(wp => (
+                    <div key={wp._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 8px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-sm)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-primary)' }}>{wp.name}</span>
+                      <Badge
+                        label={wp.status}
+                        color={wp.status === 'disrupted' ? 'var(--danger)' : 'var(--success)'}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {port && (
+          <>
+            {/* Port name */}
+            <div>
+              <div style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--text-primary)' }}>{port.name}</div>
+              {port.country && (
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>{port.country}</div>
+              )}
+            </div>
+
+            {/* Routes through this port */}
+            {(() => {
+              const portRoutes = allArcs.filter(a => a.fromPortId === port._id || a.toPortId === port._id);
+              if (portRoutes.length === 0) return null;
+              return (
+                <div>
+                  <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                    Routes ({portRoutes.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {portRoutes.map(a => (
+                      <div
+                        key={a.route._id}
+                        onClick={() => onSelectRoute(a.route)}
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+                          background: 'var(--bg-hover)', cursor: 'pointer',
+                          border: '1px solid transparent',
+                        }}
+                        onMouseEnter={(e: any) => e.currentTarget.style.borderColor = 'var(--border-bright)'}
+                        onMouseLeave={(e: any) => e.currentTarget.style.borderColor = 'transparent'}
+                      >
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-primary)' }}>{a.route.name}</span>
+                        <Badge
+                          label={a.route.status === 'disrupted' ? 'Disrupted' : 'Active'}
+                          color={a.route.status === 'disrupted' ? 'var(--danger)' : 'var(--success)'}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
+      </div>
     </div>
   );
 }
