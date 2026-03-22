@@ -1,14 +1,16 @@
-import { Queue, Worker, type Job, type WorkerOptions } from "bullmq";
+import { Queue, Worker, type Job, type WorkerOptions, type ConnectionOptions } from "bullmq";
 import Redis from "ioredis";
 
 const queues = new Map<string, Queue>();
 const workers = new Map<string, Worker>();
 
 /** BullMQ requires maxRetriesPerRequest: null for blocking commands. */
-function createBullMQConnection(): Redis {
+function createBullMQConnection(): ConnectionOptions {
+  // Cast needed: ioredis and bullmq's bundled ioredis are the same at runtime
+  // but TypeScript sees them as different types due to duplicate node_modules
   return new Redis(process.env.REDIS_URL ?? "redis://localhost:6380", {
     maxRetriesPerRequest: null,
-  });
+  }) as unknown as ConnectionOptions;
 }
 
 export function getOrCreateQueue(name: string): Queue {
