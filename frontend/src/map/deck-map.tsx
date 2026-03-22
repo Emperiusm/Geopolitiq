@@ -6,7 +6,7 @@ import { initPMTiles, getMapStyle } from './flat-view';
 import maplibregl from 'maplibre-gl';
 import { OCEAN_COLORS, TINT_SCALE } from './basemap-styles';
 import { handleViewStateChange } from './view-transition';
-import { viewMode, layers, bootstrapData, selectCountry, selectedEntity, rightPanelOpen, heatmapOpacity, basemap } from '../state/store';
+import { viewMode, layers, bootstrapData, selectCountry, selectedEntity, rightPanelOpen, heatmapOpacity, basemap, selectedTradeRoute, selectedPort, tradeRouteFilter, selectTradeRoute, selectPort } from '../state/store';
 import { getDayNightState } from './day-night';
 import { SolidPolygonLayer } from '@deck.gl/layers';
 import { createRiskHeatmapLayer } from '../layers/risk-heatmap';
@@ -30,6 +30,8 @@ function createOceanPolygon(): number[][] {
 }
 const OCEAN_POLYGON = createOceanPolygon();
 import { createTradeRoutesLayer } from '../layers/trade-routes';
+import { resolveTradeArcs } from '../layers/trade-routes-resolver';
+import type { ResolvedArc, ResolvedPort, WaypointData } from '../layers/trade-routes-resolver';
 import { createChokepointsLayer } from '../layers/chokepoints';
 import { createMilitaryBasesLayer } from '../layers/military-bases';
 import { createNSAZonesLayer } from '../layers/nsa-zones';
@@ -90,6 +92,9 @@ export function DeckMap() {
   const lastInteractionRef = useRef<number>(Date.now());
   const autoRotatingRef = useRef<boolean>(false);
   const prevBasemapRef = useRef<string>(basemap.value);
+  const resolvedArcsRef = useRef<ResolvedArc[]>([]);
+  const resolvedPortsRef = useRef<ResolvedPort[]>([]);
+  const waypointsByRouteRef = useRef<Map<string, WaypointData[]>>(new Map());
 
   const markInteraction = useCallback(() => {
     lastInteractionRef.current = Date.now();
@@ -134,7 +139,11 @@ export function DeckMap() {
         return viewState;
       },
       onClick: (info: any) => {
-        if (!info.object) return;
+        if (!info.object) {
+          selectTradeRoute(null);
+          selectPort(null);
+          return;
+        }
         const obj = info.object;
 
         if (info.layer?.id === 'risk-heatmap') {
@@ -198,6 +207,18 @@ export function DeckMap() {
     };
   }, []);
 
+  useEffect(() => {
+    const data = bootstrapData.value;
+    if (!data) return;
+    const { arcs, portList, waypointsByRoute } = resolveTradeArcs(
+      data.tradeRoutes,
+      data.ports,
+      data.chokepoints,
+    );
+    resolvedArcsRef.current = arcs;
+    resolvedPortsRef.current = portList;
+    waypointsByRouteRef.current = waypointsByRoute;
+  }, [bootstrapData.value]);
 
   // ── Auto-rotate logic ──────────────────────────────────────
   const handleAutoRotate = () => {
@@ -278,7 +299,20 @@ export function DeckMap() {
       // Country polygon fill — visible in both globe and flat modes
       createRiskPolygonLayer(data.countries, l.riskHeatmap, viewMode.value === 'flat' ? 0.5 : 1.0),
       createRiskHeatmapLayer(data.countries, l.riskHeatmap, heatmapOpacity.value, _currentViewState[viewMode.value]?.zoom ?? 1),
-      createTradeRoutesLayer(data.tradeRoutes, l.tradeRoutes),
+      ...createTradeRoutesLayer(
+        resolvedArcsRef.current.filter(a =>
+          tradeRouteFilter.value.has(a.route.category as any)
+        ),
+        resolvedArcsRef.current,
+        resolvedPortsRef.current,
+        waypointsByRouteRef.current,
+        selectedTradeRoute.value?._id ?? null,
+        selectedPort.value?._id ?? null,
+        selectTradeRoute,
+        selectPort,
+        l.tradeRoutes,
+        l.chokepoints,
+      ),
       ...createChokepointsLayer(data.chokepoints, l.chokepoints),
       createMilitaryBasesLayer(data.bases, l.militaryBases),
       createNSAZonesLayer(data.nsa, l.nsaZones),
