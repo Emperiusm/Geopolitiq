@@ -1,0 +1,24 @@
+{
+    "id": 2,
+    "jsonrpc": "2.0",
+    "result": {
+        "content": [
+            {
+                "text": "{\"name\":\"projects/6268829174203934199/screens/0cd28a6bcf124eb1b89ab0b21462111f\",\"title\":\"Geopolitiq Intelligence Dashboard Light Mode\",\"screenshot\":{\"name\":\"projects/6268829174203934199/files/92cb32bd36734f37acdbe984271eb420\",\"downloadUrl\":\"https://lh3.googleusercontent.com/aida/ADBb0uhXNzhSVv6EP7DBo7026qSW5rrTKvoVpVOFWSP77FDzBpbzPeILA2d3-GEx_QckKnqGgzCwGKCNsW-TM46Mop6XvDVxkJzZPM-_aviGTRBRudlZtonZKBDTEFq0n68zUH7pNd38lT_sBUPENk-Dt9NZBSSQblQ8rDNGEhu-NVbK1qaqY3W5D-x7adZ4nDkC7xUOYR29JQ6q6sJY3w70bm79SiXLGHN4UNBIsWR9QKYZAaJL2UdWAHSbNAQ\"},\"htmlCode\":{},\"width\":\"1376\",\"height\":\"768\",\"deviceType\":\"DESKTOP\"}",
+                "type": "text"
+            }
+        ],
+        "structuredContent": {
+            "deviceType": "DESKTOP",
+            "height": "768",
+            "htmlCode": {},
+            "name": "projects/6268829174203934199/screens/0cd28a6bcf124eb1b89ab0b21462111f",
+            "screenshot": {
+                "downloadUrl": "https://lh3.googleusercontent.com/aida/ADBb0uhXNzhSVv6EP7DBo7026qSW5rrTKvoVpVOFWSP77FDzBpbzPeILA2d3-GEx_QckKnqGgzCwGKCNsW-TM46Mop6XvDVxkJzZPM-_aviGTRBRudlZtonZKBDTEFq0n68zUH7pNd38lT_sBUPENk-Dt9NZBSSQblQ8rDNGEhu-NVbK1qaqY3W5D-x7adZ4nDkC7xUOYR29JQ6q6sJY3w70bm79SiXLGHN4UNBIsWR9QKYZAaJL2UdWAHSbNAQ",
+                "name": "projects/6268829174203934199/files/92cb32bd36734f37acdbe984271eb420"
+            },
+            "title": "Geopolitiq Intelligence Dashboard Light Mode",
+            "width": "1376"
+        }
+    }
+}

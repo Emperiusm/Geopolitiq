@@ -108,60 +108,159 @@ const DOMAIN_TIERS: Record<string, SourceTier> = {
   "marketwatch.com": "aggregator",
 };
 
-/** Map common source names to their domain for tier resolution */
+/** Map common source names (exact, lowercase) to their domain for tier resolution */
 const NAME_TO_DOMAIN: Record<string, string> = {
-  "reuters": "reuters.com",
-  "ap": "apnews.com",
-  "associated press": "apnews.com",
-  "afp": "france24.com",
-  "bbc": "bbc.co.uk",
-  "cnn": "cnn.com",
+  // Wire services
+  "reuters": "reuters.com", "reuters world": "reuters.com", "reuters business": "reuters.com",
+  "ap": "apnews.com", "ap news": "apnews.com", "associated press": "apnews.com",
+  "afp": "france24.com", "ansa": "reuters.com",
+
+  // BBC variants
+  "bbc": "bbc.com", "bbc world": "bbc.com", "bbc news": "bbc.com",
+  "bbc africa": "bbc.com", "bbc asia": "bbc.com",
+  "bbc latin america": "bbc.com", "bbc middle east": "bbc.com",
+
+  // Major outlets
+  "cnn": "cnn.com", "cnn world": "cnn.com",
   "al jazeera": "aljazeera.com",
-  "the guardian": "theguardian.com",
-  "guardian": "theguardian.com",
-  "the new york times": "nytimes.com",
-  "nyt": "nytimes.com",
+  "the guardian": "theguardian.com", "guardian": "theguardian.com",
+  "guardian world": "theguardian.com", "guardian americas": "theguardian.com",
+  "guardian me": "theguardian.com",
+  "the new york times": "nytimes.com", "nyt": "nytimes.com",
   "the washington post": "washingtonpost.com",
-  "wall street journal": "wsj.com",
-  "wsj": "wsj.com",
-  "financial times": "ft.com",
-  "bloomberg": "ft.com",
-  "cnbc": "cnbc.com",
-  "fox news": "foxnews.com",
-  "npr": "npr.org",
-  "pbs": "pbs.org",
-  "abc news": "abcnews.go.com",
-  "cbs news": "cbsnews.com",
-  "nbc news": "nbcnews.com",
-  "france 24": "france24.com",
-  "defense one": "defenseone.com",
-  "defense news": "defensenews.com",
-  "the war zone": "twz.com",
-  "bellingcat": "bellingcat.com",
-  "the diplomat": "thediplomat.com",
-  "foreign policy": "foreignpolicy.com",
-  "foreign affairs": "foreignaffairs.com",
-  "pentagon": "defense.gov",
-  "state department": "state.gov",
+  "wall street journal": "wsj.com", "wsj": "wsj.com",
+  "financial times": "ft.com", "bloomberg": "ft.com",
+  "cnbc": "cnbc.com", "fox news": "foxnews.com",
+  "npr": "npr.org", "npr news": "npr.org",
+  "pbs": "pbs.org", "pbs newshour": "pbs.org",
+  "abc news": "abcnews.go.com", "abc australia": "abc.net.au",
+  "cbs news": "cbsnews.com", "nbc news": "nbcnews.com",
+  "france 24": "france24.com", "france24": "france24.com",
+  "dw": "dw.com", "dw news": "dw.com",
+  "euronews": "euronews.com",
+  "le monde": "lemonde.fr",
+  "spiegel": "spiegel.de",
+  "tagesschau": "tagesschau.de",
+  "el país": "elpais.com", "el pais": "elpais.com",
+  "times of israel": "timesofisrael.com",
+  "haaretz": "haaretz.com",
+  "scmp": "scmp.com",
+  "the hindu": "thehindu.com",
+  "cna singapore": "channelnewsasia.com",
+  "news24": "news24.com",
+  "infobae": "infobae.com",
+  "axios": "axios.com",
+  "politico": "politico.com",
+  "the hill": "thehill.com",
+
+  // Government / intergovernmental
+  "pentagon": "defense.gov", "state dept": "state.gov", "state department": "state.gov",
   "white house": "whitehouse.gov",
-  "united nations": "un.org",
-  "un": "un.org",
-  "nato": "un.org",
-  "who": "who.int",
-  "iaea": "iaea.org",
+  "un news": "un.org", "united nations": "un.org", "un": "un.org", "nato": "un.org",
+  "who": "who.int", "iaea": "iaea.org",
+  "federal reserve": "federalreserve.gov", "fed": "federalreserve.gov",
+  "sec": "sec.gov", "cisa": "cisa.gov", "cdc": "who.int",
+  "uk gov": "gov.uk", "fao": "fao.org",
+  "world bank": "worldbank.org", "imf": "imf.org",
+  "ecdc": "who.int",
+
+  // Specialized / think tanks
+  "defense one": "defenseone.com", "defense news": "defensenews.com",
+  "the war zone": "twz.com", "task & purpose": "defenseone.com",
+  "military times": "defensenews.com", "usni news": "usni.org",
+  "bellingcat": "bellingcat.com", "oryx osint": "oryxspioenkop.com",
+  "the diplomat": "thediplomat.com",
+  "foreign policy": "foreignpolicy.com", "foreign affairs": "foreignaffairs.com",
+  "crisis group": "crisisgroup.org",
+  "atlantic council": "atlanticcouncil.org",
+  "war on the rocks": "warontherocks.com",
+  "csis": "csis.org", "brookings": "brookings.edu",
+  "cfr": "cfr.org", "rand": "rand.org",
+  "carnegie endowment": "carnegieendowment.org",
+  "chatham house": "chathamhouse.org",
+  "responsible statecraft": "responsiblestatecraft.org",
+  "insight crime": "insightcrime.org",
+  "krebs security": "krebsonsecurity.com", "schneier on security": "krebsonsecurity.com",
+  "dark reading": "krebsonsecurity.com",
+  "oilprice.com": "oilprice.com", "oil & gas news": "oilprice.com",
+  "gcaptain": "gcaptain.com",
+  "nature news": "nature.com", "sciencedaily": "sciencedaily.com",
+  "new scientist": "nature.com",
+  "nikkei asia": "scmp.com", "asahi": "scmp.com",
+  "rusi": "chathamhouse.org",
+  "lowy institute": "brookings.edu", "stimson center": "brookings.edu",
+  "wilson center": "brookings.edu", "german marshall fund": "brookings.edu",
+  "jamestown foundation": "brookings.edu", "fpri": "foreignpolicy.com",
+  "middle east institute": "atlanticcouncil.org",
+  "iss europe": "chathamhouse.org", "ecfr": "chathamhouse.org",
+  "cnas": "csis.org", "nti": "carnegieendowment.org",
+  "arms control assn": "carnegieendowment.org",
+  "fas": "carnegieendowment.org",
+  "us travel advisories": "state.gov",
+  "bulletin of atomic scientists": "carnegieendowment.org",
+  "aviation week": "defensenews.com", "flight global": "defensenews.com",
+  "rigzone": "oilprice.com",
+
+  // Regional
+  "kyiv independent": "kyivindependent.com",
+  "moscow times": "themoscowtimes.com",
+  "meduza": "meduza.io",
+  "novaya gazeta europe": "novayagazeta.eu",
+  "al arabiya": "alarabiya.net",
+  "arab news": "arabnews.com",
+  "asharq": "alarabiya.net",
+  "africanews": "africanews.com",
+  "premium times": "premiumtimesng.com", "vanguard nigeria": "premiumtimesng.com",
+  "daily trust": "premiumtimesng.com",
+  "jeune afrique": "jeuneafrique.com",
+  "bangkok post": "bangkokpost.com",
+  "japan today": "japantoday.com",
+  "mexico news daily": "mexiconewsdaily.com",
+  "hurriyet": "bangkokpost.com",
+  "nos nieuws": "bangkokpost.com", "svt nyheter": "bangkokpost.com",
+  "tvn24": "bangkokpost.com",
+  "o globo": "infobae.com", "el tiempo": "infobae.com",
+  "el universal mx": "infobae.com", "clarín": "infobae.com",
+  "indian express": "thehindu.com",
+  "vnexpress": "bangkokpost.com", "island times": "bangkokpost.com",
+
+  // Aggregators
+  "yahoo finance": "finance.yahoo.com",
+  "marketwatch": "marketwatch.com",
+  "seeking alpha": "seekingalpha.com",
+  "kitco news": "marketwatch.com",
+  "mining.com": "marketwatch.com", "mining technology": "marketwatch.com",
 };
+
+/** Keyword prefixes for partial matching (checked after exact lookup) */
+const NAME_PREFIXES: Array<[string, string]> = [
+  ["bbc", "bbc.com"],
+  ["reuters", "reuters.com"],
+  ["ap ", "apnews.com"],
+  ["guardian", "theguardian.com"],
+  ["france 24", "france24.com"],
+  ["dw ", "dw.com"],
+  ["al jazeera", "aljazeera.com"],
+];
 
 /** Look up the source tier for a feed name or domain */
 export function getSourceTier(feedNameOrDomain: string): SourceTier {
-  const lower = feedNameOrDomain.toLowerCase();
+  const lower = feedNameOrDomain.toLowerCase().trim();
 
-  // Check name-to-domain mapping first
+  // Exact name lookup
   const mappedDomain = NAME_TO_DOMAIN[lower];
   if (mappedDomain && DOMAIN_TIERS[mappedDomain]) {
     return DOMAIN_TIERS[mappedDomain];
   }
 
-  // Direct domain lookup
+  // Keyword prefix matching
+  for (const [prefix, domain] of NAME_PREFIXES) {
+    if (lower.startsWith(prefix) && DOMAIN_TIERS[domain]) {
+      return DOMAIN_TIERS[domain];
+    }
+  }
+
+  // Direct domain substring lookup (for URLs passed directly)
   for (const [domain, tier] of Object.entries(DOMAIN_TIERS)) {
     if (lower.includes(domain)) return tier;
   }

@@ -155,7 +155,7 @@ export function NewsFeed() {
                         border: '1px solid var(--success)',
                         display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600,
                       }}>
-                        {'\u2713'} Verified by {ev.sourceCount} sources
+                        {'\u2713'} Verified by {ev.sourceCount} {ev.sourceCount === 1 ? 'source' : 'sources'}
                       </span>
                     )}
                     {prov?.sourceTier && (
@@ -171,7 +171,7 @@ export function NewsFeed() {
                   </div>
                   {ev.sourceCount > 0 && (
                     <span style={{ color: 'var(--text-tertiary)', fontSize: '11px' }}>
-                      {ev.sourceCount} Sources
+                      {ev.sourceCount} {ev.sourceCount === 1 ? 'Source' : 'Sources'}
                     </span>
                   )}
                 </div>

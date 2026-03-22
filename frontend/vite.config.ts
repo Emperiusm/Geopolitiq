@@ -16,15 +16,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 5200,
+    strictPort: true,
     open: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3005',
         changeOrigin: true,
       },
       '/events': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3005',
         changeOrigin: true,
       },
     },

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GAMBIT - Historical Mode</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+<style data-purpose="custom-styles">
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: #f3f4f6;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Globe Placeholder Styling */
+        .globe-container {
+            background: radial-gradient(circle at 30% 30%, #ffffff, #e2e8f0);
+            border-radius: 50%;
+            box-shadow: inset -20px -20px 40px rgba(0,0,0,0.1), 0 10px 30px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .globe-grid {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                linear-gradient(to right, rgba(203, 213, 225, 0.4) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(203, 213, 225, 0.4) 1px, transparent 1px);
+            background-size: 20px 20px;
+            border-radius: 50%;
+            transform: scale(1.1);
+        }
+
+        .heat-point {
+            position: absolute;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            filter: blur(4px);
+        }
+        
+        .heat-red { background: radial-gradient(circle, rgba(239,68,68,0.8) 0%, rgba(239,68,68,0) 70%); }
+        .heat-blue { background: radial-gradient(circle, rgba(59,130,246,0.8) 0%, rgba(59,130,246,0) 70%); }
+        .heat-orange { background: radial-gradient(circle, rgba(245,158,11,0.8) 0%, rgba(245,158,11,0) 70%); }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="flex flex-col text-slate-800">
+<!-- BEGIN: Header -->
+<header class="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200 z-10 shrink-0">
+<div class="flex items-center gap-3">
+<div class="text-blue-600 text-2xl"><i class="fas fa-chess-knight"></i></div>
+<div>
+<h1 class="font-bold text-xl leading-tight tracking-tight text-[#1e3a8a]">GAMBIT</h1>
+<p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Global Intelligence Network</p>
+</div>
+</div>
+<!-- Alert Banner -->
+<div class="flex-1 max-w-2xl mx-6">
+<div class="bg-amber-50 rounded-lg px-4 py-2 flex items-center gap-2 shadow-sm border border-amber-200">
+<i class="fas fa-history text-amber-600 text-sm"></i>
+<span class="text-sm font-bold text-amber-700 uppercase">Archive Mode Active:</span>
+<span class="text-sm text-slate-700">Displaying data from Mar 15, 2026. Live feed paused.</span>
+</div>
+</div>
+<div class="flex items-center gap-4 text-slate-500">
+<button class="hover:text-slate-700 transition"><i class="fas fa-cog"></i></button>
+<button class="hover:text-slate-700 transition relative">
+<i class="fas fa-bell"></i>
+<span class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full border-2 border-white">4</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-slate-200 border border-slate-300"></div>
+</div>
+</header>
+<!-- END: Header -->
+<!-- BEGIN: Main Content Area -->
+<main class="flex-1 flex overflow-hidden">
+<!-- BEGIN: Left Sidebar -->
+<aside class="w-[320px] flex flex-col gap-4 p-4 bg-transparent shrink-0">
+<!-- Watchlist Panel -->
+<div class="flex-1 flex flex-col bg-white/70 backdrop-blur-md rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+<div class="p-4 border-b border-slate-200 bg-white/50 flex justify-between items-center">
+<h2 class="font-bold text-sm tracking-wide text-slate-800">CRITICAL WATCHLIST</h2>
+<button class="text-slate-400 hover:text-slate-600"><i class="fas fa-ellipsis-v"></i></button>
+</div>
+<div class="p-3">
+<div class="relative">
+<i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+<input class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 shadow-sm" placeholder="Search archived regions..." type="text"/>
+</div>
+</div>
+<!-- Toggles -->
+<div class="px-4 py-2 space-y-3 border-b border-slate-200 pb-4">
+<div class="flex justify-between items-center">
+<span class="text-sm text-slate-700 flex items-center gap-2"><i class="fas fa-stream text-slate-400 w-4 text-center"></i> Active Conflicts</span>
+<div class="w-8 h-4 bg-blue-500 rounded-full relative cursor-pointer"><div class="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div></div>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-sm text-slate-700 flex items-center gap-2"><i class="fas fa-biohazard text-slate-400 w-4 text-center"></i> Terrorism</span>
+<div class="w-8 h-4 bg-blue-500 rounded-full relative cursor-pointer"><div class="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div></div>
+</div>
+<div class="flex justify-between items-center opacity-50">
+<span class="text-sm text-slate-700 flex items-center gap-2"><i class="fas fa-laptop-code text-slate-400 w-4 text-center"></i> Cyber Threats</span>
+<div class="w-8 h-4 bg-slate-300 rounded-full relative cursor-pointer"><div class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div></div>
+</div>
+</div>
+<!-- Country List (Historical State) -->
+<div class="flex-1 overflow-y-auto p-2 space-y-1">
+<div class="flex justify-between items-center p-2 hover:bg-slate-100 rounded-md cursor-pointer transition">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-orange-500"></div>
+<span class="text-sm font-medium">SYR - Syria</span>
+</div>
+<span class="text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase">Severe</span>
+</div>
+<div class="flex justify-between items-center p-2 hover:bg-slate-100 rounded-md cursor-pointer transition">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-red-500"></div>
+<span class="text-sm font-medium">AFG - Afghanistan</span>
+</div>
+<span class="text-[10px] font-bold text-red-700 bg-red-100 px-1.5 py-0.5 rounded uppercase">Extreme</span>
+</div>
+<div class="flex justify-between items-center p-2 hover:bg-slate-100 rounded-md cursor-pointer transition">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-orange-500"></div>
+<span class="text-sm font-medium">YEM - Yemen</span>
+</div>
+<span class="text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase">Severe</span>
+</div>
+<div class="flex justify-between items-center p-2 hover:bg-slate-100 rounded-md cursor-pointer transition">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-orange-500"></div>
+<span class="text-sm font-medium">SOM - Somalia</span>
+</div>
+<span class="text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase">Severe</span>
+</div>
+<div class="flex justify-between items-center p-2 hover:bg-slate-100 cursor-pointer transition bg-slate-100 border-l-4 border-orange-500 rounded-r-md">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-orange-500"></div>
+<span class="text-sm font-medium">UKR - Ukraine</span>
+</div>
+<span class="text-[10px] font-bold text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded uppercase">Severe</span>
+</div>
+<div class="flex justify-between items-center p-2 hover:bg-slate-100 rounded-md cursor-pointer transition">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-slate-600"></div>
+<span class="text-sm font-medium">IRQ - Iraq</span>
+</div>
+<span class="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded uppercase">Stormy</span>
+</div>
+</div>
+</div>
+<!-- Risk Levels Legend -->
+<div class="bg-white/70 backdrop-blur-md rounded-xl border border-slate-200 p-4 shadow-sm shrink-0">
+<div class="flex justify-between items-center mb-2">
+<h3 class="font-bold text-xs tracking-wide text-slate-800 uppercase">Risk Index 2026</h3>
+<span class="text-[10px] text-slate-400 font-mono">Archive_V4.2</span>
+</div>
+<div class="grid grid-cols-2 gap-y-2 gap-x-4 text-xs font-mono">
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-slate-900"></div> CAT (08)</div>
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-slate-600"></div> STO (142)</div>
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-red-600"></div> EXT (14)</div>
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-slate-400"></div> CLD</div>
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-orange-500"></div> SEV (98)</div>
+<div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full border border-slate-300 bg-white"></div> CLR</div>
+</div>
+</div>
+</aside>
+<!-- END: Left Sidebar -->
+<!-- BEGIN: Center Map Area -->
+<section class="flex-1 relative flex flex-col items-center justify-center p-4">
+<!-- Historical Mode Banner -->
+<div class="absolute top-4 left-1/2 -translate-x-1/2 w-full max-w-xl z-20">
+<div class="bg-amber-400 shadow-lg rounded-xl border-2 border-amber-500 px-6 py-3 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<i class="fas fa-calendar-alt text-amber-900"></i>
+<span class="font-bold text-amber-950 tracking-tight">HISTORICAL — Mar 15, 2026 14:00 UTC</span>
+</div>
+<button class="bg-amber-950 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-black transition-colors shadow-sm">
+                    RETURN TO LIVE
+                </button>
+</div>
+</div>
+<!-- Top Filters (Pushed down by banner) -->
+<div class="absolute top-24 left-1/2 -translate-x-1/2 w-full max-w-xl z-10 flex flex-col gap-2">
+<div class="bg-white/60 backdrop-blur-lg border border-slate-200 rounded-xl p-2 shadow-sm">
+<div class="flex flex-wrap gap-2 px-1 justify-center">
+<span class="bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-md font-medium flex items-center gap-1 cursor-pointer hover:bg-blue-200"><div class="w-1.5 h-1.5 rounded-full bg-blue-600"></div> Conflict</span>
+<span class="bg-blue-100 text-blue-800 text-xs px-2.5 py-1 rounded-md font-medium flex items-center gap-1 cursor-pointer hover:bg-blue-200"><div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div> Security</span>
+<span class="bg-teal-100 text-teal-800 text-xs px-2.5 py-1 rounded-md font-medium flex items-center gap-1 cursor-pointer hover:bg-teal-200"><div class="w-1.5 h-1.5 rounded-full bg-teal-500"></div> Economic</span>
+<button class="text-xs text-slate-500 font-medium ml-1 hover:text-slate-700">Archived Filters <i class="fas fa-chevron-down text-[10px]"></i></button>
+</div>
+</div>
+</div>
+<!-- Globe Visualization (Reduced intensity for history) -->
+<div class="w-[580px] h-[580px] globe-container relative">
+<div class="globe-grid"></div>
+<svg class="absolute inset-0 w-full h-full opacity-20 drop-shadow-sm" style="fill: #94a3b8; stroke: #64748b; stroke-width: 0.2;" viewbox="0 0 100 100">
+<path d="M 40,30 Q 50,20 60,30 T 80,40 Q 90,50 80,60 T 60,80 Q 50,90 40,80 T 20,60 Q 10,50 20,40 T 40,30 Z"></path>
+</svg>
+<!-- Historical Heatmap Points -->
+<div class="heat-point heat-red w-12 h-12" style="top: 32%; left: 54%;"></div>
+<div class="heat-point heat-orange w-16 h-16" style="top: 45%; left: 50%;"></div>
+<div class="heat-point heat-blue w-10 h-10" style="top: 25%; left: 40%;"></div>
+<div class="heat-point heat-orange w-12 h-12" style="top: 60%; left: 58%;"></div>
+</div>
+<!-- Map Controls -->
+<div class="absolute right-4 bottom-28 flex flex-col gap-2 z-10">
+<div class="bg-white/80 backdrop-blur-md border border-slate-200 rounded-lg shadow-sm flex flex-col overflow-hidden">
+<button class="p-2 hover:bg-slate-50 text-slate-600 border-b border-slate-200"><i class="fas fa-plus"></i></button>
+<button class="p-2 hover:bg-slate-50 text-slate-600 border-b border-slate-200"><i class="fas fa-minus"></i></button>
+</div>
+</div>
+<!-- Bottom Timeline (Adjusted for Historical Context) -->
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-white/80 backdrop-blur-md border border-slate-200 rounded-xl p-3 shadow-sm z-10 flex items-center gap-4">
+<button class="text-slate-500 hover:text-slate-700"><i class="fas fa-undo-alt"></i></button>
+<div class="flex-1 relative">
+<!-- Timeline Labels -->
+<div class="flex justify-between text-[10px] text-slate-500 font-medium mb-1 px-2 font-mono">
+<span>Mar 14, 2026</span>
+<span class="text-blue-600 font-bold">Mar 15 (Selected)</span>
+<span>Mar 16, 2026</span>
+<span class="text-slate-400">Mar 17 (Next)</span>
+</div>
+<!-- Time Ticks -->
+<div class="flex justify-between text-[8px] text-slate-400 mb-2 px-2 font-mono">
+<span>00:00</span><span>06:00</span><span>12:00</span><span class="text-blue-700 font-bold">14:00</span><span>18:00</span><span>22:00</span><span>04:00</span><span>08:00</span>
+</div>
+<!-- Slider (Thumb at ~50%) -->
+<div class="relative w-full h-1 bg-slate-200 rounded-full">
+<div class="absolute left-0 top-0 h-full bg-blue-500 rounded-l-full" style="width: 50%;"></div>
+<input class="absolute inset-0 w-full" max="100" min="0" type="range" value="50"/>
+</div>
+</div>
+<button class="text-slate-400 hover:text-slate-600"><i class="fas fa-step-forward"></i></button>
+</div>
+</section>
+<!-- END: Center Map Area -->
+<!-- BEGIN: Right Sidebar -->
+<aside class="w-[360px] flex flex-col bg-white border-l border-slate-200 shrink-0 shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-20">
+<!-- Tabs -->
+<div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+<div class="flex gap-4">
+<button class="text-sm font-bold text-blue-600 border-b-2 border-blue-600 pb-1">ARCHIVE</button>
+<button class="text-sm font-semibold text-slate-500 hover:text-slate-700 pb-1">REPORT</button>
+<button class="text-sm font-semibold text-slate-500 hover:text-slate-700 pb-1">DATA</button>
+</div>
+<span class="text-[10px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded border border-slate-200">HISTORICAL</span>
+</div>
+<!-- Feed List (Archived Content) -->
+<div class="flex-1 overflow-y-auto p-4 space-y-3 bg-[#f8fafc]">
+<!-- Card 1 -->
+<div class="bg-white rounded-lg p-3 border border-slate-200 shadow-sm border-l-4 border-l-orange-500">
+<div class="flex gap-2 text-[10px] font-bold mb-1">
+<span class="text-orange-600 uppercase">ARCHIVED ALERT</span>
+<span class="text-slate-300">|</span>
+<span class="text-blue-500">CONFLICT</span>
+</div>
+<h4 class="text-sm font-bold text-slate-900 leading-tight mb-1">Sudan: Ceasefire Negotiations Begin</h4>
+<p class="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">Early stage talks mediated by Saudi Arabia. Significant troop movement reported near Khartoum outskirts.</p>
+<div class="text-[10px] text-slate-400 font-mono">Mar 15, 2026 - 13:42 UTC</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-white rounded-lg p-3 border border-slate-200 shadow-sm border-l-4 border-l-blue-400">
+<div class="flex gap-2 text-[10px] font-bold mb-1">
+<span class="text-blue-600 uppercase">STATUS REPORT</span>
+<span class="text-slate-300">|</span>
+<span class="text-teal-500">ECONOMY</span>
+</div>
+<h4 class="text-sm font-bold text-slate-900 leading-tight mb-1">Global Markets Stabilize After Tech Sell-off</h4>
+<p class="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">NASDAQ futures recover 1.2%. Analysts point to stabilization in semiconductor supply chains from Taiwan.</p>
+<div class="text-[10px] text-slate-400 font-mono">Mar 15, 2026 - 11:15 UTC</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-white rounded-lg p-3 border border-slate-200 shadow-sm border-l-4 border-l-slate-400">
+<div class="flex gap-2 text-[10px] font-bold mb-1">
+<span class="text-slate-500 uppercase">DIPLOMACY</span>
+<span class="text-slate-300">|</span>
+<span class="text-slate-400">G7 SUMMIT</span>
+</div>
+<h4 class="text-sm font-bold text-slate-900 leading-tight mb-1">G7 Leaders Reach Preliminary Climate Accord</h4>
+<p class="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">Draft text includes revised methane emission targets for 2030. Formal signing expected tomorrow.</p>
+<div class="text-[10px] text-slate-400 font-mono">Mar 15, 2026 - 09:30 UTC</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-white rounded-lg p-3 border border-slate-200 shadow-sm border-l-4 border-l-red-500">
+<div class="flex gap-2 text-[10px] font-bold mb-1">
+<span class="text-red-600 uppercase">ARCHIVED BREAKING</span>
+<span class="text-slate-300">|</span>
+<span class="text-blue-500">SECURITY</span>
+</div>
+<h4 class="text-sm font-bold text-slate-900 leading-tight mb-1">Localized Power Outage in Riga</h4>
+<p class="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">Substation failure affecting 15% of the city. Authorities investigating potential external interference.</p>
+<div class="text-[10px] text-slate-400 font-mono">Mar 15, 2026 - 04:22 UTC</div>
+</div>
+</div>
+<!-- Archive Summary -->
+<div class="p-4 border-t border-slate-200 bg-white">
+<div class="bg-slate-50 rounded-lg p-3 border border-slate-100">
+<p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Archive Integrity</p>
+<div class="flex items-center gap-2">
+<div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden">
+<div class="bg-green-500 h-full" style="width: 98%;"></div>
+</div>
+<span class="text-[10px] font-mono font-bold text-green-600">98%</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- END: Right Sidebar -->
+</main>
+<!-- END: Main Content Area -->
+</body></html>

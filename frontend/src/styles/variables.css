@@ -224,7 +224,7 @@
   --risk-clear: #208860;
 
   /* --- Globe-specific -------------------------------------- */
-  --globe-bg: radial-gradient(ellipse 80% 80% at 50% 55%, #dce4f0, #c8d4e8 40%, #b8c8e0 70%, #e0e6f0);
+  --globe-bg: #f0f4f8;
   --globe-atmosphere: rgba(0, 80, 180, 0.08);
 
   /* --- Scrollbar ------------------------------------------- */

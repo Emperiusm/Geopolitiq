@@ -1,0 +1,123 @@
+[Skip to content](https://maplibre.org/maplibre-gl-js/docs/examples/display-a-hybrid-satellite-map-with-terrain-elevation/#display-a-hybrid-satellite-map-with-terrain-elevation)
+
+# Display a hybrid satellite map with terrain elevation
+
+Display a hybrid satellite map with terrain elevation.
+
+Display a hybrid satellite map with terrain elevation
+
+[MapLibre](https://maplibre.org/) \| [AW3D30 (JAXA)](https://earth.jaxa.jp/en/data/policy/) \| [OpenFreeMap](https://openfreemap.org/) [© OpenMapTiles](https://www.openmaptiles.org/) Data from [OpenStreetMap](https://www.openstreetmap.org/copyright)
+
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Display a hybrid satellite map with terrain elevation</title>
+    <meta property="og:description" content="Display a hybrid satellite map with terrain elevation." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.20.2/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.20.2/dist/maplibre-gl.js'></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+    const map = new maplibregl.Map({
+        container: 'map',
+        zoom: 12,
+        center: [11.39085, 47.27574],
+        pitch: 70,
+        maxPitch: 95
+    });
+
+    map.setStyle('https://tiles.openfreemap.org/styles/bright', {
+            transformStyle: (previousStyle, nextStyle) => {
+                nextStyle.projection = {type: 'globe'};
+                nextStyle.sources = {
+                    ...nextStyle.sources,
+                    satelliteSource: {
+                        type: 'raster',
+                        tiles: [\
+                            'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg'\
+                        ],
+                        tileSize: 256
+                    },
+                    terrainSource: {
+                        type: 'raster-dem',
+                        url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+                        tileSize: 256
+                    },
+                    hillshadeSource: {
+                        type: 'raster-dem',
+                        url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+                        tileSize: 256
+                    }
+                }
+                nextStyle.terrain = {
+                    source: 'terrainSource',
+                    exaggeration: 1
+                }
+
+                nextStyle.sky = {
+                    'atmosphere-blend': [\
+                        'interpolate',\
+                        ['linear'],\
+                        ['zoom'],\
+                        0, 1,\
+                        2, 0\
+                    ],
+                }
+
+                nextStyle.layers.push({
+                    id: 'hills',
+                    type: 'hillshade',
+                    source: 'hillshadeSource',
+                    layout: { visibility: 'visible' },
+                    paint: { 'hillshade-shadow-color': '#473B24' }
+                })
+
+                const firstNonFillLayer = nextStyle.layers.find(layer => layer.type !== 'fill' && layer.type !== 'background');
+                nextStyle.layers.splice(nextStyle.layers.indexOf(firstNonFillLayer), 0, {
+                    id: 'satellite',
+                    type: 'raster',
+                    source: 'satelliteSource',
+                    layout: { visibility: 'visible' },
+                    paint: { 'raster-opacity': 1 }
+                });
+
+                return nextStyle;
+            }
+        })
+
+    map.addControl(
+        new maplibregl.NavigationControl({
+            visualizePitch: true,
+            showZoom: true,
+            showCompass: true
+        })
+    );
+
+    map.addControl(
+        new maplibregl.GlobeControl()
+    );
+
+    map.addControl(
+        new maplibregl.TerrainControl({
+            source: 'terrainSource',
+            exaggeration: 1
+        })
+    );
+</script>
+</body>
+</html>
+```
+
+Back to top
+
+### Filters
+
+#### Tags

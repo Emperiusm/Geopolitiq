@@ -31,6 +31,7 @@ body {
     "timeline timeline";
   height: 100vh;
   width: 100vw;
+  overflow: hidden;
 }
 
 .app-layout--right-open {
@@ -43,9 +44,9 @@ body {
 
 /* --- Grid area assignments -------------------------------- */
 .app-header { grid-area: header; }
-.sidebar { grid-area: sidebar; }
-.map-viewport { grid-area: map; position: relative; overflow: hidden; }
-.right-panel { grid-area: panel; }
+.sidebar { grid-area: sidebar; min-height: 0; overflow: hidden; }
+.map-viewport { grid-area: map; position: relative; overflow: hidden; min-height: 0; }
+.right-panel { grid-area: panel; min-height: 0; overflow: hidden; }
 .news-panel { grid-area: news; }
 .timeline-bar { grid-area: timeline; }
 

@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAMBIT — Platform Architecture Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A3 landscape; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --bg-base: #08080e;
+    --bg-raised: #0e0e18;
+    --bg-panel: #121220;
+    --bg-card: #16162a;
+    --bg-hover: #1c1c36;
+    --border: #1e1e3a;
+    --border-bright: #2a2a50;
+    --text-primary: #e4e4ec;
+    --text-secondary: #9898b0;
+    --text-tertiary: #6a6a82;
+    --accent-blue: #4a9eff;
+    --accent-cyan: #22d3a8;
+    --accent-amber: #f0a030;
+    --accent-red: #ef5050;
+    --accent-purple: #9466ff;
+    --accent-pink: #e855a0;
+  }
+
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 9.5px;
+    line-height: 1.45;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    width: 1580px;
+    min-height: 1080px;
+    margin: 0 auto;
+    padding: 28px 32px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Ambient background effects */
+  .page::before {
+    content: '';
+    position: absolute;
+    top: -200px; right: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(74,158,255,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .page::after {
+    content: '';
+    position: absolute;
+    bottom: -200px; left: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(34,211,168,0.03) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Grid texture overlay */
+  .grid-overlay {
+    position: absolute; inset: 0;
+    background-image: 
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 20%, transparent 100%);
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0;
+    width: 200px; height: 2px;
+    background: linear-gradient(90deg, var(--accent-blue), transparent);
+  }
+
+  .logo-block { display: flex; align-items: baseline; gap: 14px; }
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px; font-weight: 600;
+    letter-spacing: 6px;
+    color: var(--text-primary);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--accent-blue); }
+  .tagline {
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .header-meta {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-tertiary);
+    line-height: 1.6;
+  }
+
+  /* Main grid — 4 columns */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr 1fr 280px;
+    gap: 14px;
+    position: relative;
+  }
+
+  /* Section panels */
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    position: relative;
+  }
+  .panel.accent-blue { border-top: 2px solid var(--accent-blue); }
+  .panel.accent-cyan { border-top: 2px solid var(--accent-cyan); }
+  .panel.accent-amber { border-top: 2px solid var(--accent-amber); }
+  .panel.accent-red { border-top: 2px solid var(--accent-red); }
+  .panel.accent-purple { border-top: 2px solid var(--accent-purple); }
+  .panel.accent-pink { border-top: 2px solid var(--accent-pink); }
+
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .section-label .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .section-label.blue { color: var(--accent-blue); }
+  .section-label.blue .dot { background: var(--accent-blue); }
+  .section-label.cyan { color: var(--accent-cyan); }
+  .section-label.cyan .dot { background: var(--accent-cyan); }
+  .section-label.amber { color: var(--accent-amber); }
+  .section-label.amber .dot { background: var(--accent-amber); }
+  .section-label.red { color: var(--accent-red); }
+  .section-label.red .dot { background: var(--accent-red); }
+  .section-label.purple { color: var(--accent-purple); }
+  .section-label.purple .dot { background: var(--accent-purple); }
+  .section-label.pink { color: var(--accent-pink); }
+  .section-label.pink .dot { background: var(--accent-pink); }
+
+  /* Description text */
+  .desc { color: var(--text-secondary); margin-bottom: 8px; }
+  .desc strong { color: var(--text-primary); font-weight: 500; }
+
+  /* Agent lists */
+  .agent-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 10px;
+  }
+  .agent-item {
+    display: flex; align-items: center; gap: 5px;
+    padding: 2.5px 0;
+    font-size: 8.5px;
+  }
+  .agent-item .status {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .agent-item .status.active { background: var(--accent-cyan); box-shadow: 0 0 4px rgba(34,211,168,0.4); }
+  .agent-item .status.stubbed { background: var(--text-tertiary); }
+  .agent-item .name { color: var(--text-primary); font-weight: 500; }
+  .agent-item .source { color: var(--text-tertiary); font-size: 7.5px; margin-left: auto; font-family: 'JetBrains Mono', monospace; }
+
+  /* Full width agent row */
+  .agent-full { grid-template-columns: 1fr 1fr 1fr; }
+
+  /* Feature chips */
+  .chip-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2.5px 7px;
+    font-size: 8px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .chip.highlight { border-color: var(--accent-blue); color: var(--accent-blue); }
+  .chip.cyan { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .chip.amber { border-color: var(--accent-amber); color: var(--accent-amber); }
+
+  /* Stats blocks */
+  .stats-row {
+    display: flex; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .stat-block {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .stat-block .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px; font-weight: 600;
+    color: var(--accent-blue);
+    line-height: 1.2;
+  }
+  .stat-block .label {
+    font-size: 7px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Tech stack table */
+  .tech-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .tech-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--border);
+    font-size: 8.5px;
+    vertical-align: top;
+  }
+  .tech-table td:first-child {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5px;
+    color: var(--text-tertiary);
+    width: 70px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .tech-table td:last-child { color: var(--text-primary); }
+
+  /* Data flow arrow chain */
+  .flow-chain {
+    display: flex; align-items: center; gap: 0;
+    padding: 8px 0;
+    flex-wrap: wrap;
+  }
+  .flow-node {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 7.5px;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    color: var(--text-tertiary);
+    padding: 0 3px;
+    font-size: 10px;
+  }
+
+  /* Node/Edge schema */
+  .schema-block {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .schema-block .key { color: var(--accent-purple); }
+  .schema-block .type { color: var(--accent-cyan); }
+  .schema-block .comment { color: var(--text-tertiary); }
+
+  /* Phase timeline */
+  .phase-list { list-style: none; }
+  .phase-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .phase-item:last-child { border: none; }
+  .phase-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px; font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .phase-badge.p1 { background: rgba(74,158,255,0.15); color: var(--accent-blue); }
+  .phase-badge.p2 { background: rgba(34,211,168,0.15); color: var(--accent-cyan); }
+  .phase-badge.p3 { background: rgba(148,102,255,0.15); color: var(--accent-purple); }
+  .phase-badge.p4 { background: rgba(240,160,48,0.15); color: var(--accent-amber); }
+  .phase-badge.p5 { background: rgba(239,80,80,0.15); color: var(--accent-red); }
+
+  .phase-content { flex: 1; }
+  .phase-title { font-weight: 600; font-size: 8.5px; color: var(--text-primary); }
+  .phase-desc { font-size: 7.5px; color: var(--text-tertiary); margin-top: 1px; }
+
+  /* Entity type badges */
+  .entity-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 8px;
+  }
+  .entity-item {
+    display: flex; align-items: center; gap: 4px;
+    padding: 2px 0;
+    font-size: 8px;
+  }
+  .entity-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 6.5px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+    min-width: 52px;
+    text-align: center;
+  }
+  .eb-geo { background: rgba(74,158,255,0.15); color: var(--accent-blue); }
+  .eb-econ { background: rgba(34,211,168,0.15); color: var(--accent-cyan); }
+  .eb-sec { background: rgba(239,80,80,0.15); color: var(--accent-red); }
+  .eb-info { background: rgba(148,102,255,0.15); color: var(--accent-purple); }
+
+  /* Confidence thresholds */
+  .conf-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 0;
+    font-size: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .conf-row:last-child { border: none; }
+  .conf-bar {
+    height: 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* Relationship pills */
+  .rel-grid { display: flex; flex-wrap: wrap; gap: 3px; }
+  .rel-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 6.5px;
+    padding: 2px 5px;
+    border-radius: 2px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+
+  /* Sub-section divider */
+  .sub-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+  }
+
+  /* Compact list */
+  .compact-list {
+    list-style: none;
+  }
+  .compact-list li {
+    padding: 2px 0;
+    font-size: 8.5px;
+    color: var(--text-secondary);
+    display: flex; align-items: flex-start; gap: 5px;
+  }
+  .compact-list li::before {
+    content: '›';
+    color: var(--accent-blue);
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: -0.5px;
+  }
+  .compact-list li strong { color: var(--text-primary); font-weight: 500; }
+
+  /* Memory tiers */
+  .mem-tier {
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 4px 0;
+  }
+  .mem-icon {
+    width: 16px; height: 16px;
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .mem-tier .mem-label { font-weight: 500; color: var(--text-primary); font-size: 8.5px; }
+  .mem-tier .mem-desc { color: var(--text-tertiary); font-size: 7.5px; }
+
+  /* Footer */
+  .footer {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px;
+    color: var(--text-tertiary);
+  }
+
+  @media print {
+    body { background: var(--bg-base); }
+    .page { width: 100%; padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+<div class="grid-overlay"></div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo-block">
+    <div class="logo">GAM<span>B</span>IT</div>
+    <div class="tagline">AI Intelligence Platform Engine · <span style="color:var(--accent-cyan)">Signal</span>: Geopolitical Dashboard</div>
+  </div>
+  <div class="header-meta">
+    ARCHITECTURE BRIEF v2.0<br>
+    CLASSIFICATION: INTERNAL<br>
+    MARCH 2026
+  </div>
+</div>
+
+<!-- STATS ROW -->
+<div class="stats-row" style="margin-bottom:14px;">
+  <div class="stat-block"><div class="value">1M+</div><div class="label">Graph Nodes</div></div>
+  <div class="stat-block"><div class="value">30</div><div class="label">Agent Categories</div></div>
+  <div class="stat-block"><div class="value">10</div><div class="label">V1 Active Agents</div></div>
+  <div class="stat-block"><div class="value">3</div><div class="label">View Modes</div></div>
+  <div class="stat-block"><div class="value" style="color:var(--accent-cyan)">4</div><div class="label">Data Stores</div></div>
+  <div class="stat-block"><div class="value" style="color:var(--accent-amber)">15</div><div class="label">BullMQ Queues</div></div>
+  <div class="stat-block"><div class="value" style="color:var(--accent-purple)">40+</div><div class="label">Entity Types</div></div>
+  <div class="stat-block"><div class="value" style="color:var(--accent-pink)">9</div><div class="label">SSE Event Types</div></div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="main-grid">
+
+<!-- ===== COLUMN 1: Core Architecture + Graph Model ===== -->
+<div style="display:flex;flex-direction:column;gap:12px;">
+
+  <!-- Vision -->
+  <div class="panel accent-blue">
+    <div class="section-label blue"><span class="dot"></span>PLATFORM VISION</div>
+    <div class="desc">
+      <strong>Gambit is a SaaS platform SDK engine.</strong> The platform provides the knowledge graph, autonomous agents, data pipeline, SSE event bus, and bootstrap API. <strong>Signal</strong> is the first product built on it — a geopolitical intelligence dashboard. Future products (supply chain, energy markets, election monitoring) share the same engine with different dashboards. Analysts interact through a 3D globe, GPU-accelerated graph explorer, and LLM-powered analytical assistant.
+    </div>
+    <div class="flow-chain">
+      <div class="flow-node" style="border-color:var(--text-tertiary)">30 Sources</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--accent-amber)">BullMQ</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--accent-purple)">Orchestrator</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--accent-cyan)">Agents</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--accent-blue)">Neo4j</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node" style="border-color:var(--accent-pink)">Views</div>
+    </div>
+  </div>
+
+  <!-- Graph Model -->
+  <div class="panel accent-purple">
+    <div class="section-label purple"><span class="dot"></span>KNOWLEDGE GRAPH MODEL</div>
+    <div class="schema-block">
+      <span class="key">(:Entity</span> {<br>
+      &nbsp;&nbsp;<span class="key">id:</span> <span class="type">String</span> <span class="comment">// "country:iran"</span><br>
+      &nbsp;&nbsp;<span class="key">type:</span> <span class="type">String</span> <span class="comment">// 40+ entity types</span><br>
+      &nbsp;&nbsp;<span class="key">lat/lng:</span> <span class="type">Float?</span> <span class="comment">// spatial coords</span><br>
+      &nbsp;&nbsp;<span class="key">embedding:</span> <span class="type">Float[1024]</span> <span class="comment">// mxbai-embed-large</span><br>
+      &nbsp;&nbsp;<span class="key">confidence:</span> <span class="type">Float</span> <span class="comment">// 0.0-1.0</span><br>
+      &nbsp;&nbsp;<span class="key">properties:</span> <span class="type">Map</span> <span class="comment">// type-specific</span><br>
+      })
+    </div>
+    <div class="schema-block">
+      <span class="key">[:RELATES_TO</span> {<br>
+      &nbsp;&nbsp;<span class="key">relation:</span> <span class="type">String</span>, <span class="key">weight:</span> <span class="type">Float</span>,<br>
+      &nbsp;&nbsp;<span class="key">confidence:</span> <span class="type">Float</span>, <span class="key">provenance:</span> <span class="type">List</span><br>
+      }]
+    </div>
+
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin:4px 0 3px;font-weight:500;">ENTITY TYPES</div>
+    <div class="entity-grid">
+      <div class="entity-item"><span class="entity-badge eb-geo">GEO</span> Country, Person, Organization</div>
+      <div class="entity-item"><span class="entity-badge eb-geo">GEO</span> Conflict, Election, Treaty</div>
+      <div class="entity-item"><span class="entity-badge eb-econ">ECON</span> Vessel, Port, Trade Route</div>
+      <div class="entity-item"><span class="entity-badge eb-econ">ECON</span> Chokepoint, Commodity, Company</div>
+      <div class="entity-item"><span class="entity-badge eb-sec">SEC</span> Military Base, Cyber Incident</div>
+      <div class="entity-item"><span class="entity-badge eb-sec">SEC</span> Flight, Satellite Observation</div>
+      <div class="entity-item"><span class="entity-badge eb-info">INFO</span> Article, Event, Claim</div>
+      <div class="entity-item"><span class="entity-badge eb-info">INFO</span> Sanction, Pattern, Annotation</div>
+    </div>
+
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin:6px 0 3px;font-weight:500;">RELATIONSHIP TYPES</div>
+    <div class="rel-grid">
+      <span class="rel-pill">ALLIES_WITH</span>
+      <span class="rel-pill">HOSTILE_TO</span>
+      <span class="rel-pill">SUPPLIES</span>
+      <span class="rel-pill">SANCTIONS</span>
+      <span class="rel-pill">OPERATES_IN</span>
+      <span class="rel-pill">LEADS</span>
+      <span class="rel-pill">TRADES_WITH</span>
+      <span class="rel-pill">MENTIONS</span>
+      <span class="rel-pill">CONTROLS</span>
+      <span class="rel-pill">ATTRIBUTED_TO</span>
+      <span class="rel-pill">OBSERVED_AT</span>
+      <span class="rel-pill">TARGETS</span>
+      <span class="rel-pill">EXPLOITS</span>
+      <span class="rel-pill">CORRELATES</span>
+    </div>
+  </div>
+
+  <!-- Temporal + Provenance -->
+  <div class="panel accent-cyan">
+    <div class="section-label cyan"><span class="dot"></span>TEMPORAL VERSIONING + PROVENANCE</div>
+    <ul class="compact-list">
+      <li><strong>Event sourcing</strong> — append-only log of all graph mutations</li>
+      <li><strong>Materialized snapshots</strong> every 6h for fast historical queries</li>
+      <li><strong>Full provenance chain</strong> — every node/edge traces to source, agent, reasoning</li>
+      <li><strong>Graph state at time T</strong> — replay events for any historical moment</li>
+      <li><strong>Analyst corrections</strong> recorded as feedback for agent learning</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- ===== COLUMN 2: All 30 Agents ===== -->
+<div style="display:flex;flex-direction:column;gap:12px;">
+
+  <div class="panel accent-cyan">
+    <div class="section-label cyan"><span class="dot"></span>V1 AGENTS (1 ACTIVE · 9 PLANNED)</div>
+    <div class="desc">Active agents fully implemented. Planned agents have extraction schemas designed; awaiting data source connections.</div>
+
+    <div class="agent-grid">
+      <div class="agent-item"><span class="status active"></span><span class="name">News / RSS</span><span class="source">140+ feeds</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Conflict / ACLED</span><span class="source">ACLED, UCDP</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Sanctions</span><span class="source">OFAC, EU, UN</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Elections</span><span class="source">IFES, feeds</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Shipping / AIS</span><span class="source">AIS, MarineTr</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Satellite</span><span class="source">Sentinel, Planet</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Social / OSINT</span><span class="source">X, Telegram</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Cyber Threats</span><span class="source">CISA, MITRE</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Financial Markets</span><span class="source">Market APIs</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Flight / ADS-B</span><span class="source">ADS-B Exchange</span></div>
+    </div>
+
+    <div class="sub-divider"></div>
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin-bottom:4px;font-weight:500;">AGENT OUTPUT FORMAT (all agents share)</div>
+    <div class="schema-block" style="margin-bottom:0;">
+      { <span class="key">op:</span> <span class="type">"upsert_node"</span> | <span class="type">"upsert_edge"</span> | <span class="type">"merge_node"</span>,<br>
+      &nbsp;&nbsp;<span class="key">confidence:</span> <span class="type">Float</span>, <span class="key">reasoning:</span> <span class="type">String</span> }
+    </div>
+  </div>
+
+  <div class="panel" style="border-top:2px solid var(--text-tertiary);">
+    <div class="section-label" style="color:var(--text-tertiary);"><span class="dot" style="background:var(--text-tertiary)"></span>V2+ STUBBED AGENTS (20)</div>
+    <div class="desc" style="font-size:8px;">Defined in registry with interfaces. Implementation = system prompt + source connection.</div>
+    
+    <div class="agent-grid agent-full">
+      <!-- Security -->
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Terrorism / Extremism</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Military Movements</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Nuclear / WMD</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Law Enforcement</span></div>
+      <!-- Economic -->
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Trade Flows / Tariffs</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Commodities / Energy</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Supply Chain</span></div>
+      <!-- Political -->
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Diplomatic Comms</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">UN / Intl Orgs</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Legislative / Regulatory</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">NGO / Humanitarian</span></div>
+      <!-- Environmental -->
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Weather / Disasters</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Climate / Environmental</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Infrastructure Status</span></div>
+      <!-- Information -->
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Disinfo Tracking</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Academic / Think Tank</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Sentiment Analysis</span></div>
+      <!-- Signals -->
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">RF / SIGINT (open)</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Maritime Domain</span></div>
+      <div class="agent-item"><span class="status stubbed"></span><span class="name">Space / Orbital</span></div>
+    </div>
+
+    <div class="sub-divider"></div>
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin-bottom:3px;font-weight:500;">DYNAMIC AGENTS (runtime)</div>
+    <div class="desc" style="font-size:8px;margin-bottom:0;">
+      Orchestrator creates new agents on-the-fly via Opus call. Triggered by: new data sources, emerging patterns, or analyst requests. Generates system prompt, extraction schema, graph permissions, cost budget.
+    </div>
+  </div>
+
+  <!-- Orchestrator + Agent Architecture -->
+  <div class="panel accent-amber">
+    <div class="section-label amber"><span class="dot"></span>ORCHESTRATOR + AGENT ARCHITECTURE</div>
+    <ul class="compact-list">
+      <li><strong>Routing</strong> — incoming data → correct agent(s), multi-agent for cross-domain</li>
+      <li><strong>Lifecycle</strong> — start/stop/restart, health monitoring, concurrency scaling</li>
+      <li><strong>Cost management</strong> — per-agent daily token budgets, tier selection</li>
+      <li><strong>Quality assurance</strong> — sample outputs, flag low-confidence, track accuracy</li>
+      <li><strong>Conflict resolution</strong> — contradictory operations → Opus or analyst escalation</li>
+      <li><strong>Priority management</strong> — crisis detection → surge relevant queues</li>
+      <li><strong>Dynamic creation</strong> — new agent specs generated at runtime by Opus</li>
+    </ul>
+
+    <div class="sub-divider"></div>
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin-bottom:3px;font-weight:500;">AGENT MEMORY (3 TIERS)</div>
+    <div class="mem-tier">
+      <div class="mem-icon" style="background:rgba(74,158,255,0.15);color:var(--accent-blue);">F</div>
+      <div><span class="mem-label">Factual</span> — <span class="mem-desc">The graph itself + temporal versioning. Agents query Neo4j for world state.</span></div>
+    </div>
+    <div class="mem-tier">
+      <div class="mem-icon" style="background:rgba(148,102,255,0.15);color:var(--accent-purple);">P</div>
+      <div><span class="mem-label">Procedural</span> — <span class="mem-desc">Per-agent lessons learned doc. Updated on corrections. Prepended to system prompt.</span></div>
+    </div>
+    <div class="mem-tier">
+      <div class="mem-icon" style="background:rgba(34,211,168,0.15);color:var(--accent-cyan);">S</div>
+      <div><span class="mem-label">Strategic</span> — <span class="mem-desc">Pattern embeddings for historical parallel detection via vector similarity.</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== COLUMN 3: Frontend + Features ===== -->
+<div style="display:flex;flex-direction:column;gap:12px;">
+
+  <!-- Frontend Views -->
+  <div class="panel accent-blue">
+    <div class="section-label blue"><span class="dot"></span>FRONTEND VIEWS</div>
+    
+    <div style="margin-bottom:6px;">
+      <div style="font-size:8.5px;font-weight:600;color:var(--accent-blue);margin-bottom:2px;">Globe View — Deck.GL + MapLibre GL + PMTiles</div>
+      <div style="font-size:8px;color:var(--text-secondary);">Primary operational view. Nodes as points at geo coords, edges as arcs across globe surface. GlobeView → MapView (flat) on zoom. Millions of points via typed arrays + GPU instancing.</div>
+    </div>
+    <div style="margin-bottom:6px;">
+      <div style="font-size:8.5px;font-weight:600;color:var(--accent-purple);margin-bottom:2px;">Graph Explorer — Cosmograph</div>
+      <div style="font-size:8px;color:var(--text-secondary);">Full dataset GPU-accelerated graph visualization. Force-directed layout. Focused subgraph mode from any entity. Peer view to the globe, not subordinate.</div>
+    </div>
+    <div>
+      <div style="font-size:8.5px;font-weight:600;color:var(--accent-cyan);margin-bottom:2px;">Map View — Flat 2D (MapLibre GL)</div>
+      <div style="font-size:8px;color:var(--text-secondary);">Automatic transition from globe to flat map on zoom. Same Deck.GL layers, orthographic projection. Enables high-detail regional analysis.</div>
+    </div>
+  </div>
+
+  <!-- LLM Integration -->
+  <div class="panel accent-pink">
+    <div class="section-label pink"><span class="dot"></span>LLM INTELLIGENCE LAYER</div>
+    
+    <div style="margin-bottom:6px;">
+      <div style="font-size:8.5px;font-weight:500;color:var(--text-primary);margin-bottom:2px;">Chat Agent (Sonnet / Opus)</div>
+      <div class="chip-grid" style="margin-bottom:4px;">
+        <span class="chip highlight">query_graph</span>
+        <span class="chip highlight">semantic_search</span>
+        <span class="chip highlight">find_paths</span>
+        <span class="chip highlight">highlight_on_map</span>
+        <span class="chip">search_raw_docs</span>
+        <span class="chip">get_timeline</span>
+        <span class="chip">compare_entities</span>
+        <span class="chip">create_annotation</span>
+        <span class="chip">generate_report</span>
+      </div>
+    </div>
+    
+    <div style="margin-bottom:6px;">
+      <div style="font-size:8.5px;font-weight:500;color:var(--text-primary);margin-bottom:2px;">Monitoring Agents</div>
+      <div style="font-size:8px;color:var(--text-secondary);">Anomaly detection (z-score deviations), pattern recognition (historical parallels via embeddings), consistency checking (contradictions in graph).</div>
+    </div>
+
+    <div>
+      <div style="font-size:8.5px;font-weight:500;color:var(--text-primary);margin-bottom:2px;">Synthesis Agent (Opus)</div>
+      <div style="font-size:8px;color:var(--text-secondary);">Daily/weekly briefs, entity dossiers, situation reports, on-demand analysis. Export: PDF, Markdown, JSON, email.</div>
+    </div>
+
+    <div class="sub-divider"></div>
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin-bottom:3px;font-weight:500;">MODEL TIERS</div>
+    <table class="tech-table">
+      <tr><td style="color:var(--accent-cyan);">HAIKU</td><td>Ingestion agents — high volume extraction, cost-optimized</td></tr>
+      <tr><td style="color:var(--accent-blue);">SONNET</td><td>Monitoring, chat, orchestration, complex extraction (sanctions, OSINT)</td></tr>
+      <tr><td style="color:var(--accent-purple);">OPUS</td><td>Deep analysis, synthesis, dynamic agent creation, conflict resolution</td></tr>
+    </table>
+  </div>
+
+  <!-- Analyst Features -->
+  <div class="panel accent-amber">
+    <div class="section-label amber"><span class="dot"></span>ANALYST FEATURES</div>
+    <div class="chip-grid" style="margin-bottom:6px;">
+      <span class="chip amber">Annotations</span>
+      <span class="chip amber">Manual nodes/edges</span>
+      <span class="chip amber">Corrections</span>
+      <span class="chip amber">Assessments</span>
+      <span class="chip cyan">Multi-user collaboration</span>
+      <span class="chip cyan">WebSocket presence</span>
+      <span class="chip cyan">Shared views</span>
+      <span class="chip highlight">Timeline scrubber</span>
+      <span class="chip highlight">Compare mode</span>
+      <span class="chip highlight">Global search</span>
+      <span class="chip highlight">Entity detail panel</span>
+      <span class="chip">News feed + provenance</span>
+      <span class="chip">Trust badges</span>
+      <span class="chip">Alert history</span>
+      <span class="chip">Report export</span>
+      <span class="chip">BYOK config</span>
+    </div>
+  </div>
+
+  <!-- Confidence + Circuit Breakers -->
+  <div class="panel accent-red">
+    <div class="section-label red"><span class="dot"></span>CONFIDENCE THRESHOLDS</div>
+    <div class="conf-row">
+      <span class="conf-bar" style="width:60px;background:var(--accent-cyan);"></span>
+      <span style="font-weight:500;color:var(--text-primary);min-width:36px;">> 0.9</span>
+      <span style="color:var(--text-secondary);">Autonomous — act, log, QA samples</span>
+    </div>
+    <div class="conf-row">
+      <span class="conf-bar" style="width:48px;background:var(--accent-blue);"></span>
+      <span style="font-weight:500;color:var(--text-primary);min-width:36px;">0.7–0.9</span>
+      <span style="color:var(--text-secondary);">Act + flag for analyst review queue</span>
+    </div>
+    <div class="conf-row">
+      <span class="conf-bar" style="width:34px;background:var(--accent-amber);"></span>
+      <span style="font-weight:500;color:var(--text-primary);min-width:36px;">0.5–0.7</span>
+      <span style="color:var(--text-secondary);">Propose, wait for analyst approval</span>
+    </div>
+    <div class="conf-row">
+      <span class="conf-bar" style="width:20px;background:var(--accent-red);"></span>
+      <span style="font-weight:500;color:var(--text-primary);min-width:36px;">< 0.5</span>
+      <span style="color:var(--text-secondary);">Escalate to orchestrator / Opus / analyst</span>
+    </div>
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin-top:4px;">
+      <strong style="color:var(--accent-red);">Mandatory review:</strong> Merging high-edge nodes, new alliances/conflicts, risk tier changes ≥2, dynamic agent first 24h, cost overage >120%.
+    </div>
+  </div>
+</div>
+
+<!-- ===== COLUMN 4: Tech Stack + Phases ===== -->
+<div style="display:flex;flex-direction:column;gap:12px;">
+
+  <!-- Tech Stack -->
+  <div class="panel accent-blue">
+    <div class="section-label blue"><span class="dot"></span>TECHNOLOGY STACK</div>
+    <table class="tech-table">
+      <tr><td>GRAPH</td><td>Neo4j 5 + vector indexes + APOC + GDS</td></tr>
+      <tr><td>DOCS</td><td>MongoDB 7 (raw data, agent state, users)</td></tr>
+      <tr><td>CACHE</td><td>Redis 7 (cache, sessions, BullMQ queues)</td></tr>
+      <tr><td>QUEUE</td><td>BullMQ (Redis-backed, priority lanes)</td></tr>
+      <tr><td>API</td><td>Bun + Hono (REST, SSE)</td></tr>
+      <tr><td>FRONTEND</td><td>Preact 10 + Signals + Vite 8</td></tr>
+      <tr><td>GLOBE</td><td>Deck.GL 9 + MapLibre GL + PMTiles</td></tr>
+      <tr><td>GRAPH VIZ</td><td>Cosmograph (@cosmograph/cosmos) · GPU WebGL</td></tr>
+      <tr><td>LLM</td><td>Anthropic Claude (Haiku/Sonnet/Opus)</td></tr>
+      <tr><td>EMBED</td><td>Ollama — mxbai-embed-large (1024d, local)</td></tr>
+      <tr><td>AUTH</td><td>OAuth/SSO + JWT + RBAC (planned)</td></tr>
+      <tr><td>STYLE</td><td>CSS custom properties (no framework)</td></tr>
+      <tr><td>TEST</td><td>Bun test</td></tr>
+      <tr><td>DEPLOY</td><td>Docker Compose → Railway/Fly.io</td></tr>
+    </table>
+  </div>
+
+  <!-- Auth & Multi-tenancy -->
+  <div class="panel accent-purple">
+    <div class="section-label purple"><span class="dot"></span>AUTH + MULTI-TENANCY</div>
+    <ul class="compact-list">
+      <li><strong>OAuth/SSO</strong> — Google, GitHub, Microsoft, SAML 2.0</li>
+      <li><strong>Roles</strong> — Viewer → Analyst → Team Lead → Admin</li>
+      <li><strong>Team scoping</strong> — entity types, regions, classifications</li>
+      <li><strong>Data isolation</strong> — all queries filtered by team scope</li>
+    </ul>
+  </div>
+
+  <!-- Alerting -->
+  <div class="panel accent-amber">
+    <div class="section-label amber"><span class="dot"></span>ALERTING + SSE EVENTS</div>
+    <ul class="compact-list" style="margin-bottom:4px;">
+      <li><strong>Email, Slack, Webhook</strong> delivery via BullMQ</li>
+      <li><strong>Custom rules</strong> — anomaly, pattern, threshold, entity change, Cypher</li>
+      <li><strong>Cooldown periods</strong> + alert history logging</li>
+    </ul>
+    <div style="font-size:7.5px;color:var(--text-tertiary);margin-bottom:3px;font-weight:500;">SSE EVENT TYPES</div>
+    <div class="chip-grid">
+      <span class="chip">graph:node-*</span>
+      <span class="chip">graph:edge-*</span>
+      <span class="chip">alert:anomaly</span>
+      <span class="chip">alert:pattern</span>
+      <span class="chip">agent:status</span>
+      <span class="chip">agent:insight</span>
+      <span class="chip">news:article</span>
+      <span class="chip">news:analysis</span>
+      <span class="chip">report:ready</span>
+    </div>
+  </div>
+
+  <!-- Build Phases -->
+  <div class="panel accent-cyan">
+    <div class="section-label cyan"><span class="dot"></span>BUILD PHASES (~9 WEEKS)</div>
+    <ul class="phase-list">
+      <li class="phase-item">
+        <span class="phase-badge p1">P1 WK1-2</span>
+        <div class="phase-content">
+          <div class="phase-title">Foundation</div>
+          <div class="phase-desc">Docker, Neo4j schema, graph API, event sourcing, orchestrator skeleton, news agent, Ollama embeddings, SSE</div>
+        </div>
+      </li>
+      <li class="phase-item">
+        <span class="phase-badge p2">P2 WK2-3</span>
+        <div class="phase-content">
+          <div class="phase-title">Frontend core</div>
+          <div class="phase-desc">Preact scaffold, Deck.GL globe + MapLibre GL + PMTiles, Cosmograph GPU graph explorer, view switching, entity panel, sidebar, SSE live updates, search</div>
+        </div>
+      </li>
+      <li class="phase-item">
+        <span class="phase-badge p3">P3 WK3-5</span>
+        <div class="phase-content">
+          <div class="phase-title">Intelligence layer</div>
+          <div class="phase-desc">9 remaining V1 agents, monitoring agents, chat agent with tools, alert system, external alerting</div>
+        </div>
+      </li>
+      <li class="phase-item">
+        <span class="phase-badge p4">P4 WK5-7</span>
+        <div class="phase-content">
+          <div class="phase-title">Analyst tools</div>
+          <div class="phase-desc">Annotations, timeline scrubber, compare mode, news feed, synthesis, reports, collaboration, settings</div>
+        </div>
+      </li>
+      <li class="phase-item">
+        <span class="phase-badge p5">P5 WK7-9</span>
+        <div class="phase-content">
+          <div class="phase-title">Autonomy + scale</div>
+          <div class="phase-desc">Dynamic agents, procedural memory, strategic memory, cost management, RBAC, performance, stub V2 agents, deploy</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Entity Resolution -->
+  <div class="panel" style="border-top:2px solid var(--text-tertiary);">
+    <div class="section-label" style="color:var(--text-secondary);"><span class="dot" style="background:var(--text-secondary)"></span>ENTITY RESOLUTION</div>
+    <ul class="compact-list">
+      <li><strong>LLM-autonomous</strong> — agents decide: create, merge, or flag</li>
+      <li><strong>Alias index</strong> in Neo4j accumulates references over time</li>
+      <li><strong>Candidate matching</strong> via label, embedding proximity, aliases</li>
+      <li><strong>Feedback loop</strong> — analyst corrections → agent memory → improved future accuracy</li>
+    </ul>
+  </div>
+
+</div>
+
+</div><!-- end main-grid -->
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>GAMBIT v2 ARCHITECTURE · AI INTELLIGENCE PLATFORM ENGINE · SIGNAL: GEOPOLITICAL DASHBOARD</span>
+  <span>Neo4j + MongoDB + Redis · Deck.GL + MapLibre + PMTiles · Claude Haiku/Sonnet/Opus · Ollama mxbai</span>
+  <span>CONFIDENTIAL · MARCH 2026</span>
+</div>
+
+</div><!-- end page -->
+</body>
+</html>
