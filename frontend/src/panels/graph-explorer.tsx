@@ -155,7 +155,7 @@ export function GraphExplorer() {
       simulationDecay:        3000,
       simulationFriction:     0.85,
       simulationGravity:      0.15,
-      disableAttribution:     true,
+      attribution:            '',
       renderHoveredPointRing: true,
       hoveredPointCursor:     'pointer',
       fitViewOnInit:          false,
