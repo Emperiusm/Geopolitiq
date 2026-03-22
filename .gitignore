@@ -7,3 +7,15 @@ backups/
 certbot/
 *.tar.gz
 dist/
+
+# IDE / tool state
+frontend/.claude/
+.playwright-mcp/
+.superpowers/brainstorm/
+
+# Debug artifacts
+frontend/ts_errors*.txt
+verify-*.png
+
+# Backup files
+*.bak
