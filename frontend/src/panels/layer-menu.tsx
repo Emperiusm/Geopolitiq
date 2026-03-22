@@ -1,5 +1,6 @@
 import { h } from 'preact';
-import { layers, toggleLayer, applyPreset, LayerPreset, pluginManifests, heatmapOpacity } from '../state/store';
+import { layers, toggleLayer, applyPreset, LayerPreset, pluginManifests, heatmapOpacity, tradeRouteFilter, bootstrapData } from '../state/store';
+import { resolveTradeArcs } from '../layers/trade-routes-resolver';
 
 export function LayerMenu() {
   const state = layers.value;
@@ -75,7 +76,91 @@ export function LayerMenu() {
         <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '1px', marginBottom: '8px' }}>
           Economic
         </div>
-        <Toggle id="tradeRoutes" label="Global Trade Routes" color="var(--cat-economic)" />
+        {/* Trade Routes toggle row with disruption badge */}
+        {(() => {
+          const isOn = state.tradeRoutes;
+          const filter = tradeRouteFilter.value;
+          const data = bootstrapData.value;
+
+          let disruptedCount = 0;
+          if (isOn && data) {
+            const { arcs } = resolveTradeArcs(data.tradeRoutes, data.ports, data.chokepoints);
+            disruptedCount = arcs.filter(a =>
+              filter.has(a.route.category as any) && a.route.status === 'disrupted'
+            ).length;
+          }
+
+          const CATEGORIES = ['energy', 'container', 'bulk'] as const;
+
+          return (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--cat-economic)' }} />
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>Global Trade Routes</span>
+                  {isOn && disruptedCount > 0 && (
+                    <span style={{
+                      fontSize: 'var(--text-2xs)', fontWeight: 600, fontFamily: 'var(--font-mono)',
+                      color: 'var(--danger)', background: 'var(--danger-dim)',
+                      padding: '1px 6px', borderRadius: 'var(--radius-full)',
+                    }}>
+                      {disruptedCount} disrupted
+                    </span>
+                  )}
+                </div>
+                <div
+                  onClick={() => toggleLayer('tradeRoutes')}
+                  style={{
+                    width: 32, height: 16, borderRadius: 16,
+                    background: isOn ? 'var(--accent-blue)' : 'var(--bg-elevated)',
+                    position: 'relative', cursor: 'pointer',
+                    border: '1px solid var(--border-medium)',
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute', top: 1, left: isOn ? 17 : 1,
+                    width: 12, height: 12, borderRadius: '50%',
+                    background: 'var(--text-primary)', transition: 'left 0.2s',
+                  }} />
+                </div>
+              </div>
+
+              {/* Category chips — only visible when toggle is on */}
+              {isOn && (
+                <div style={{ display: 'flex', gap: '4px', marginLeft: 16, marginBottom: '4px' }}>
+                  {CATEGORIES.map(cat => {
+                    const active = filter.has(cat);
+                    const isLastActive = active && filter.size === 1;
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => {
+                          if (isLastActive) return;
+                          const next = new Set(filter);
+                          if (active) next.delete(cat);
+                          else next.add(cat);
+                          tradeRouteFilter.value = next;
+                        }}
+                        style={{
+                          padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                          fontSize: 'var(--text-2xs)', fontWeight: 600,
+                          fontFamily: 'var(--font-mono)', textTransform: 'capitalize',
+                          cursor: isLastActive ? 'not-allowed' : 'pointer',
+                          border: `1px solid ${active ? 'var(--cat-economic)' : 'var(--border-medium)'}`,
+                          background: active ? 'var(--cat-economic-dim, rgba(20,184,166,0.1))' : 'transparent',
+                          color: active ? 'var(--cat-economic)' : 'var(--text-tertiary)',
+                          opacity: isLastActive ? 0.5 : 1,
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
         <Toggle id="chokepoints" label="Strategic Chokepoints" color="var(--warning)" />
       </div>
 
