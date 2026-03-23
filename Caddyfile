@@ -1,0 +1,33 @@
+:80 {
+    handle /api/v1/events/* {
+        reverse_proxy api-dev:3000 {
+            flush_interval -1
+            transport http {
+                read_timeout 0
+            }
+        }
+    }
+    handle /engine/v1/stream/* {
+        reverse_proxy engine-dev:3001 {
+            flush_interval -1
+            transport http {
+                read_timeout 0
+            }
+        }
+    }
+    handle /api/v1/* {
+        reverse_proxy api-dev:3000
+    }
+    handle /engine/v1/* {
+        reverse_proxy engine-dev:3001
+    }
+    handle /temporal/* {
+        reverse_proxy temporal-ui:8080
+    }
+    handle /minio/* {
+        reverse_proxy minio:9001
+    }
+    handle {
+        reverse_proxy frontend-dev:5200
+    }
+}
