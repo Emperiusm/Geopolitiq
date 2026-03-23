@@ -13,7 +13,13 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "seed": "bun src/seed/seed-from-mongo.ts"
+    "seed": "bun src/seed/seed-from-mongo.ts",
+    "worker:fetch": "bun src/pipeline/workers/fetch-worker.ts",
+    "worker:parse-structured": "bun src/pipeline/workers/parse-structured-worker.ts",
+    "worker:parse-agent": "bun src/pipeline/workers/parse-agent-worker.ts",
+    "worker:resolve": "bun src/pipeline/workers/resolve-worker.ts",
+    "worker:write": "bun src/pipeline/workers/write-worker.ts",
+    "worker:system": "bun src/pipeline/workers/system-worker.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
