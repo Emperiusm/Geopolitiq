@@ -392,14 +392,27 @@ services:
       - all
 
   # ═══════════════════════════════════════════════════
-  # OBSERVABILITY PROFILE — Tempo, Grafana
+  # OBSERVABILITY PROFILE — OTel Collector, Tempo, Grafana
   # ═══════════════════════════════════════════════════
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./docker/otel/config.yaml:/etc/otel/config.yaml
+    depends_on:
+      - tempo
+    profiles:
+      - observability
+      - all
 
   tempo:
     image: grafana/tempo:latest
     ports:
       - "3200:3200"
-      - "4317:4317"
     profiles:
       - observability
       - all

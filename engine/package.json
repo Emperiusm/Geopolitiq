@@ -20,13 +20,18 @@
     "worker:parse-agent": "bun src/pipeline/workers/parse-agent-worker.ts",
     "worker:resolve": "bun src/pipeline/workers/resolve-worker.ts",
     "worker:write": "bun src/pipeline/workers/write-worker.ts",
-    "worker:system": "bun src/pipeline/workers/system-worker.ts"
+    "worker:system": "bun src/pipeline/workers/system-worker.ts",
+    "test:pipeline": "vitest run test/pipeline/e2e.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@clickhouse/client": "^1.8.0",
     "@gambit/common": "workspace:*",
     "@hono/zod-validator": "^0.4.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.71.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.213.0",
+    "@opentelemetry/sdk-node": "^0.213.0",
     "@temporalio/activity": "^1.15.0",
     "@temporalio/client": "^1.11.0",
     "@temporalio/worker": "^1.15.0",
