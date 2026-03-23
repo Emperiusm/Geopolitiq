@@ -1,0 +1,41 @@
+id: source:job-postings
+name: Job Postings — Tech / Defense / AI
+category: job-posting
+polarity: behavioral
+tier: 2
+
+fetcher:
+  type: http
+  url: "https://jobs.lever.co/{company}/feed"
+  schedule: "0 */8 * * *"   # every 8 hours
+  pagination: none
+  rateLimitMs: 2000
+
+parser:
+  # Hybrid mode: agent parser for structured extraction
+  # Job postings have too much variation for a deterministic structured parser
+  mode: hybrid
+  model: claude-haiku-4-5
+  maxInputTokens: 6000
+  prompt: |
+    You are analyzing job postings to extract strategic intelligence signals.
+    For each job posting, extract:
+    - Company name (entityNames)
+    - Job title (headline)
+    - Key technologies, skills, or domains mentioned
+    - Seniority level and team signals (e.g. "growing AI safety team")
+    - Any strategic indicators (clearance required, specific programs)
+    Output as a JSON array of ParsedSignal objects.
+
+domains:
+  - talent
+  - hiring
+  - workforce
+
+meta:
+  format: html
+  dataSource: Company career pages via Lever/Greenhouse/Workday APIs
+  notes: >
+    Job postings use the agent (hybrid) parser — too much format variation for a
+    deterministic structured parser. Signals indicate hiring intent and strategic
+    direction. Clearance-required postings are high-value behavioral signals.

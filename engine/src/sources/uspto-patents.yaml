@@ -1,0 +1,30 @@
+id: source:uspto-patents
+name: USPTO Patent Grants (Full-Text)
+category: patent-filing
+polarity: behavioral
+tier: 3
+
+fetcher:
+  type: http
+  url: "https://developer.uspto.gov/api/v1/datasets/patent/grant/records"
+  schedule: "0 6 * * 2"   # weekly, Tuesday 06:00 UTC (USPTO releases Tuesdays)
+  pagination: cursor
+  rateLimitMs: 2000
+  auth:
+    type: api-key
+    keyRef: USPTO_API_KEY
+
+parser:
+  mode: structured
+  ref: uspto-patent
+
+domains:
+  - intellectual-property
+  - patents
+
+meta:
+  format: xml
+  dataSource: USPTO PatentsView API
+  notes: >
+    Full-text patent grants XML. Parser extracts assignee, title, abstract,
+    CPC codes, and citation graph edges (cites-patent, builds-on-ip-of).

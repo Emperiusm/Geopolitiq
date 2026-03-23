@@ -1,0 +1,32 @@
+id: source:semantic-scholar
+name: Semantic Scholar — Research Papers
+category: research-paper
+polarity: behavioral
+tier: 3
+
+fetcher:
+  type: http
+  url: "https://api.semanticscholar.org/graph/v1/paper/search?query={query}&fields=paperId,externalIds,title,abstract,year,publicationDate,venue,publicationVenue,authors,citationCount,referenceCount,fieldsOfStudy,url"
+  schedule: "0 0 * * 4"   # weekly, Thursday midnight UTC
+  pagination: offset
+  rateLimitMs: 200
+  auth:
+    type: api-key
+    keyRef: SEMANTIC_SCHOLAR_API_KEY
+
+parser:
+  mode: structured
+  ref: semantic-scholar
+
+domains:
+  - research
+  - academia
+  - ai
+
+meta:
+  format: json
+  dataSource: Semantic Scholar Open Research Corpus API
+  notes: >
+    Research paper metadata from Semantic Scholar. Parser extracts title, authors,
+    affiliations (entity names), abstract, venue, and citation count.
+    Author affiliations are extracted as entity name candidates.
