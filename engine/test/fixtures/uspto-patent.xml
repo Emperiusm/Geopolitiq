@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<us-patent-grant lang="EN" dtd-version="v4.7 2022-02-17">
+  <us-bibliographic-data-grant>
+    <publication-reference>
+      <document-id>
+        <country>US</country>
+        <doc-number>11922548</doc-number>
+        <kind>B2</kind>
+        <date>20240305</date>
+      </document-id>
+    </publication-reference>
+    <application-reference>
+      <document-id>
+        <country>US</country>
+        <doc-number>17234567</doc-number>
+        <date>20210419</date>
+      </document-id>
+    </application-reference>
+    <invention-title id="d2e43">Advanced Transformer Architecture for Large Language Model Inference</invention-title>
+    <us-parties>
+      <us-applicants>
+        <us-applicant sequence="00" app-type="applicant">
+          <addressbook>
+            <orgname>Anthropic PBC</orgname>
+            <address>
+              <city>San Francisco</city>
+              <state>CA</state>
+              <country>US</country>
+            </address>
+          </addressbook>
+        </us-applicant>
+      </us-applicants>
+      <inventors>
+        <inventor sequence="00">
+          <addressbook>
+            <first-name>Jane</first-name>
+            <last-name>Smith</last-name>
+          </addressbook>
+        </inventor>
+        <inventor sequence="01">
+          <addressbook>
+            <first-name>John</first-name>
+            <last-name>Doe</last-name>
+          </addressbook>
+        </inventor>
+      </inventors>
+    </us-parties>
+    <assignees>
+      <assignee>
+        <addressbook>
+          <orgname>Anthropic PBC</orgname>
+        </addressbook>
+      </assignee>
+    </assignees>
+    <classifications-cpc>
+      <main-cpc>
+        <classification-cpc>
+          <section>G</section>
+          <class>06</class>
+          <subclass>N</subclass>
+          <main-group>3</main-group>
+          <subgroup>04</subgroup>
+          <classification-value>I</classification-value>
+          <action-date><date>20240305</date></action-date>
+          <generating-office><country>US</country></generating-office>
+          <classification-status>B</classification-status>
+          <classification-source>H</classification-source>
+          <scheme-origination-code>C</scheme-origination-code>
+        </classification-cpc>
+      </main-cpc>
+      <further-cpc>
+        <classification-cpc>
+          <section>G</section>
+          <class>06</class>
+          <subclass>F</subclass>
+          <main-group>40</main-group>
+          <subgroup>30</subgroup>
+        </classification-cpc>
+      </further-cpc>
+    </classifications-cpc>
+    <us-references-cited>
+      <us-citation>
+        <patcit num="00001">
+          <document-id>
+            <country>US</country>
+            <doc-number>10987654</doc-number>
+            <kind>B1</kind>
+            <date>20210420</date>
+            <name>OpenAI Inc</name>
+          </document-id>
+        </patcit>
+        <category>cited by examiner</category>
+      </us-citation>
+      <us-citation>
+        <patcit num="00002">
+          <document-id>
+            <country>US</country>
+            <doc-number>10123456</doc-number>
+            <kind>B2</kind>
+            <date>20191015</date>
+            <name>Google LLC</name>
+          </document-id>
+        </patcit>
+        <category>cited by applicant</category>
+      </us-citation>
+    </us-references-cited>
+  </us-bibliographic-data-grant>
+  <abstract id="abstract">
+    <p id="p-0001" num="0001">Systems and methods for efficient transformer-based neural network inference, including novel attention mechanisms that reduce computational complexity while maintaining model accuracy for large-scale language model deployments.</p>
+  </abstract>
+</us-patent-grant>
