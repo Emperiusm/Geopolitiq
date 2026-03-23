@@ -1,0 +1,27 @@
+id: source:uspto-trademarks
+name: USPTO Trademark Applications (TSDR)
+category: trademark-filing
+polarity: behavioral
+tier: 3
+
+fetcher:
+  type: http
+  url: "https://tsdrapi.uspto.gov/ts/cd/casestatus/sn{serial}/content.xml"
+  schedule: "0 8 * * 3"   # weekly, Wednesday 08:00 UTC
+  pagination: cursor
+  rateLimitMs: 1500
+
+parser:
+  mode: structured
+  ref: uspto-trademarks
+
+domains:
+  - intellectual-property
+  - trademarks
+
+meta:
+  format: xml
+  dataSource: USPTO Trademark Status and Document Retrieval (TSDR) API
+  notes: >
+    Trademark application XML from TSDR API. Parser extracts mark text,
+    applicant name, filing date, and goods/services international class codes.

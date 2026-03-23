@@ -1,5 +1,6 @@
-import { pgTable, text, numeric, timestamp, jsonb, integer, index, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, text, numeric, timestamp, jsonb, integer, index, uniqueIndex, boolean } from 'drizzle-orm/pg-core';
 import { teams } from './auth';
+import { sources } from './signals';
 
 export const pipelineRuns = pgTable('pipeline_runs', {
   id: text('id').primaryKey(),
@@ -10,6 +11,19 @@ export const pipelineRuns = pgTable('pipeline_runs', {
   itemsProcessed: integer('items_processed').default(0),
   itemsFailed: integer('items_failed').default(0),
   error: text('error'),
+  sourceId: text('source_id').references(() => sources.id),
+  fetched: integer('fetched').default(0),
+  parsed: integer('parsed').default(0),
+  deduplicated: integer('deduplicated').default(0),
+  classified: integer('classified').default(0),
+  resolved: integer('resolved').default(0),
+  written: integer('written').default(0),
+  graphed: integer('graphed').default(0),
+  published: integer('published').default(0),
+  dlqd: integer('dlqd').default(0),
+  costTokensIn: integer('cost_tokens_in').default(0),
+  costTokensOut: integer('cost_tokens_out').default(0),
+  costEstimatedUsd: numeric('cost_estimated_usd').default('0'),
   meta: jsonb('meta').$type<Record<string, any>>().default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
@@ -82,4 +96,52 @@ export const webhookDeliveries = pgTable('webhook_deliveries', {
   teamIdx: index('idx_webhook_deliveries_team').on(table.teamId),
   eventIdx: index('idx_webhook_deliveries_event').on(table.event),
   retryIdx: index('idx_webhook_deliveries_retry').on(table.nextRetryAt),
+}));
+
+export const parserPromptVersions = pgTable('parser_prompt_versions', {
+  id: text('id').primaryKey(),
+  sourceId: text('source_id').notNull().references(() => sources.id),
+  version: integer('version').notNull(),
+  prompt: text('prompt').notNull(),
+  responseSchema: jsonb('response_schema').$type<Record<string, any>>().notNull(),
+  accuracyAtRotation: numeric('accuracy_at_rotation'),
+  dlqRateAtRotation: numeric('dlq_rate_at_rotation'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  sourceVersionIdx: uniqueIndex('idx_prompt_versions_source_version').on(table.sourceId, table.version),
+}));
+
+export const sourceConfigAudit = pgTable('source_config_audit', {
+  id: text('id').primaryKey(),
+  sourceId: text('source_id').notNull().references(() => sources.id),
+  changedBy: text('changed_by').notNull(),
+  field: text('field').notNull(),
+  oldValue: text('old_value'),
+  newValue: text('new_value'),
+  changedAt: timestamp('changed_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  sourceIdx: index('idx_config_audit_source').on(table.sourceId),
+}));
+
+export const clickhouseSyncDlq = pgTable('clickhouse_sync_dlq', {
+  id: text('id').primaryKey(),
+  signalId: text('signal_id').notNull(),
+  error: text('error').notNull(),
+  attemptCount: integer('attempt_count').default(1),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }).defaultNow().notNull(),
+  resolution: text('resolution'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const webhookEndpoints = pgTable('webhook_endpoints', {
+  id: text('id').primaryKey(),
+  teamId: text('team_id').notNull().references(() => teams.id),
+  url: text('url').notNull(),
+  secret: text('secret').notNull(),
+  eventTypes: text('event_types').array().notNull(),
+  active: boolean('active').default(true),
+  failureCount: integer('failure_count').default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  teamIdx: index('idx_webhook_endpoints_team').on(table.teamId),
 }));

@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<ownershipDocument>
+  <schemaVersion>X0508</schemaVersion>
+  <documentType>4</documentType>
+  <periodOfReport>2026-03-15</periodOfReport>
+  <issuer>
+    <issuerCik>0001045810</issuerCik>
+    <issuerName>NVIDIA CORP</issuerName>
+    <issuerTradingSymbol>NVDA</issuerTradingSymbol>
+  </issuer>
+  <reportingOwner>
+    <reportingOwnerId>
+      <rptOwnerCik>0001517239</rptOwnerCik>
+      <rptOwnerName>Kress Colette</rptOwnerName>
+    </reportingOwnerId>
+    <reportingOwnerRelationship>
+      <isOfficer>1</isOfficer>
+      <officerTitle>EVP and CFO</officerTitle>
+    </reportingOwnerRelationship>
+  </reportingOwner>
+  <nonDerivativeTable>
+    <nonDerivativeTransaction>
+      <securityTitle>
+        <value>Common Stock</value>
+      </securityTitle>
+      <transactionDate>
+        <value>2026-03-15</value>
+      </transactionDate>
+      <transactionCoding>
+        <transactionFormType>4</transactionFormType>
+        <transactionCode>S</transactionCode>
+        <equitySwapInvolved>0</equitySwapInvolved>
+      </transactionCoding>
+      <transactionAmounts>
+        <transactionShares>
+          <value>15000</value>
+        </transactionShares>
+        <transactionPricePerShare>
+          <value>875.50</value>
+        </transactionPricePerShare>
+        <transactionAcquiredDisposedCode>
+          <value>D</value>
+        </transactionAcquiredDisposedCode>
+      </transactionAmounts>
+      <postTransactionAmounts>
+        <sharesOwnedFollowingTransaction>
+          <value>385000</value>
+        </sharesOwnedFollowingTransaction>
+      </postTransactionAmounts>
+    </nonDerivativeTransaction>
+  </nonDerivativeTable>
+  <ownerSignature>
+    <signatureName>/s/ David M. Shannon, Attorney-in-Fact for Colette Kress</signatureName>
+    <signatureDate>2026-03-17</signatureDate>
+  </ownerSignature>
+</ownershipDocument>

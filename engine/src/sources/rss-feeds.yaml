@@ -1,0 +1,24 @@
+# RSS Feeds — Template / reference config
+# Individual feeds are migrated via src/seed/feed-migration.ts
+# This file represents the canonical parser configuration for all RSS sources.
+
+id: rss-template
+name: RSS Feed (template)
+category: news-article
+polarity: classify
+tier: 2
+
+fetcher:
+  type: rss
+  schedule: "0 */6 * * *"   # standard: every 6 hours
+  pagination: none
+  rateLimitMs: 1000
+
+parser:
+  mode: structured
+  ref: rss
+
+# Tier schedule reference:
+#   fast     (tier 1): "*/60 * * * *"   — every 60 minutes
+#   standard (tier 2): "0 */6 * * *"    — every 6 hours
+#   slow     (tier 3): "0 0 * * 1"      — weekly (Monday midnight)
