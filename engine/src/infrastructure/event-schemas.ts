@@ -45,47 +45,56 @@ export interface StreamConfig {
   subjects: string[];
   /** Retention in seconds */
   maxAge: number;
+  /** Max bytes per stream (10 GB) */
+  maxBytes: number;
   storage: 'file' | 'memory';
 }
 
 const DAY = 86_400;
 const HOUR = 3_600;
+const GB10 = 10 * 1024 * 1024 * 1024;
 
 export const STREAM_CONFIGS: StreamConfig[] = [
   {
     name: STREAMS.SIGNALS,
     subjects: ['signals.>'],
     maxAge: 7 * DAY,
+    maxBytes: GB10,
     storage: 'file',
   },
   {
     name: STREAMS.ENTITIES,
     subjects: ['entities.>'],
     maxAge: 7 * DAY,
+    maxBytes: GB10,
     storage: 'file',
   },
   {
     name: STREAMS.GAP_SCORES,
     subjects: ['gaps.>'],
     maxAge: 7 * DAY,
+    maxBytes: GB10,
     storage: 'file',
   },
   {
     name: STREAMS.ALERTS,
     subjects: ['alerts.>'],
     maxAge: 7 * DAY,
+    maxBytes: GB10,
     storage: 'file',
   },
   {
     name: STREAMS.DLQ,
     subjects: ['dlq.>'],
     maxAge: 30 * DAY,
+    maxBytes: GB10,
     storage: 'file',
   },
   {
     name: STREAMS.SYSTEM,
     subjects: ['system.>'],
     maxAge: 1 * DAY,
+    maxBytes: GB10,
     storage: 'memory',
   },
 ];

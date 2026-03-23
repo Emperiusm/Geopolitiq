@@ -64,7 +64,11 @@ export class NatsEventBus implements EventBus {
           await this.ctx.jsm.streams.update(cfg.name, {
             subjects: cfg.subjects,
             max_age: maxAgeNs,
+            max_bytes: cfg.maxBytes,
             storage,
+            retention: RetentionPolicy.Limits,
+            num_replicas: 1,
+            duplicate_window: DEDUP_WINDOW_NS,
           });
           this.logger.debug({ stream: cfg.name }, 'NATS stream updated');
         } catch {
@@ -73,6 +77,7 @@ export class NatsEventBus implements EventBus {
             name: cfg.name,
             subjects: cfg.subjects,
             max_age: maxAgeNs,
+            max_bytes: cfg.maxBytes,
             storage,
             retention: RetentionPolicy.Limits,
             num_replicas: 1,

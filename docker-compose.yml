@@ -401,6 +401,11 @@ services:
       - "8222:8222"
     volumes:
       - nats_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
     profiles:
       - engine
       - all
