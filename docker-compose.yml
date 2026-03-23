@@ -213,6 +213,8 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
+    profiles:
+      - dev
 
   # ═══════════════════════════════════════════════════
   # ENGINE INFRASTRUCTURE — Postgres, PgBouncer, Redis-persistent
