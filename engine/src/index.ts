@@ -184,12 +184,22 @@ async function boot() {
       }
     }
 
-    // 2. Drain NATS (before DB pool — lets in-flight publishes complete)
+    // 2. Stop feature flag watcher before draining NATS
+    if (featureFlags) {
+      try {
+        await featureFlags.stop();
+        logger.info('Feature flags stopped');
+      } catch (err) {
+        logger.warn({ err }, 'Error stopping feature flags');
+      }
+    }
+
+    // 3. Drain NATS (before DB pool — lets in-flight publishes complete)
     if (nats) {
       await drainNats(nats, logger);
     }
 
-    // 3. Close Redis connections
+    // 4. Close Redis connections
     if (redisCache) {
       try {
         await redisCache.quit();
@@ -207,7 +217,7 @@ async function boot() {
       }
     }
 
-    // 4. Close ClickHouse
+    // 5. Close ClickHouse
     if (clickhouse) {
       try {
         await clickhouse.close();
@@ -217,7 +227,7 @@ async function boot() {
       }
     }
 
-    // 5. Close PostgreSQL (last — most critical)
+    // 6. Close PostgreSQL (last — most critical)
     try {
       await closePgPool();
       logger.info('PostgreSQL disconnected');

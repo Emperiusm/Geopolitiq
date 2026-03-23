@@ -6,6 +6,9 @@ import type { NatsContext } from './nats';
 
 const KV_BUCKET = 'gambit-flags';
 
+const decoder = new TextDecoder();
+const encoder = new TextEncoder();
+
 // ── NatsFeatureFlags ──────────────────────────────────────────────────
 
 export class NatsFeatureFlags {
@@ -33,7 +36,7 @@ export class NatsFeatureFlags {
       const iter = await this.kv.history();
       for await (const entry of iter) {
         if (entry.value && entry.value.length > 0) {
-          const val = new TextDecoder().decode(entry.value);
+          const val = decoder.decode(entry.value);
           this.cache.set(entry.key, val === 'true');
         }
       }
@@ -47,14 +50,12 @@ export class NatsFeatureFlags {
   }
 
   private startWatch(): void {
-    this.ctx.js.views
-      .kv(KV_BUCKET)
-      .then((kv) => kv.watch())
+    this.kv!.watch()
       .then((watcher) => {
         this.watcher = watcher;
         (async () => {
           for await (const entry of this.watcher!) {
-            const val = new TextDecoder().decode(entry.value);
+            const val = decoder.decode(entry.value);
             this.cache.set(entry.key, val === 'true');
             this.logger.debug({ key: entry.key, value: val }, 'Feature flag updated');
           }
@@ -74,13 +75,16 @@ export class NatsFeatureFlags {
 
   /** Set a feature flag in NATS KV (propagates to all instances) */
   async setFlag(flag: string, enabled: boolean): Promise<void> {
-    const payload = new TextEncoder().encode(String(enabled));
+    const payload = encoder.encode(String(enabled));
     await this.kv.put(flag, payload);
   }
 
   /** Stop the watcher */
   async stop(): Promise<void> {
-    this.watcher?.stop();
+    if (this.watcher) {
+      this.watcher.stop();
+      this.watcher = undefined;
+    }
   }
 }
 

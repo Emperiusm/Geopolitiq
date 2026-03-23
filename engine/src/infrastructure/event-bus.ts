@@ -12,6 +12,8 @@ import {
 
 const ulid = monotonicFactory();
 
+const encoder = new TextEncoder();
+
 // ── Dedup window: 10 minutes in nanoseconds (nats Nanos = number) ─────
 
 const DEDUP_WINDOW_NS = 10 * 60 * 1_000_000_000;
@@ -71,19 +73,23 @@ export class NatsEventBus implements EventBus {
             duplicate_window: DEDUP_WINDOW_NS,
           });
           this.logger.debug({ stream: cfg.name }, 'NATS stream updated');
-        } catch {
-          // Stream doesn't exist — create it
-          await this.ctx.jsm.streams.add({
-            name: cfg.name,
-            subjects: cfg.subjects,
-            max_age: maxAgeNs,
-            max_bytes: cfg.maxBytes,
-            storage,
-            retention: RetentionPolicy.Limits,
-            num_replicas: 1,
-            duplicate_window: DEDUP_WINDOW_NS,
-          });
-          this.logger.info({ stream: cfg.name }, 'NATS stream created');
+        } catch (infoErr: any) {
+          // Only attempt creation if the stream genuinely doesn't exist
+          if (infoErr?.code === '404' || infoErr?.message?.includes('not found')) {
+            await this.ctx.jsm.streams.add({
+              name: cfg.name,
+              subjects: cfg.subjects,
+              max_age: maxAgeNs,
+              max_bytes: cfg.maxBytes,
+              storage,
+              retention: RetentionPolicy.Limits,
+              num_replicas: 1,
+              duplicate_window: DEDUP_WINDOW_NS,
+            });
+            this.logger.info({ stream: cfg.name }, 'Stream created');
+          } else {
+            this.logger.warn({ err: infoErr, stream: cfg.name }, 'Stream info check failed — skipping');
+          }
         }
       } catch (err) {
         this.logger.warn({ err, stream: cfg.name }, 'Failed to ensure NATS stream');
@@ -99,7 +105,7 @@ export class NatsEventBus implements EventBus {
       h.set('Gambit-Team-Id', event.metadata.teamId);
     }
 
-    const payload = new TextEncoder().encode(JSON.stringify(event));
+    const payload = encoder.encode(JSON.stringify(event));
 
     try {
       await this.ctx.js.publish(subject, payload, { headers: h });
