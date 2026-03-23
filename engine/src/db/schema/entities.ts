@@ -24,6 +24,7 @@ export const entities = pgTable('entities', {
   signalCountDeclarative: integer('signal_count_declarative').default(0),
   signalCountBehavioral: integer('signal_count_behavioral').default(0),
   realityScore: numeric('reality_score'),
+  version: integer('version').default(1),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({

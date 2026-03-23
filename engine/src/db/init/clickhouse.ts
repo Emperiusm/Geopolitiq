@@ -46,6 +46,50 @@ export async function initClickhouse(clickhouseClient: any | null, logger: Logge
       `,
     });
 
+    await clickhouseClient.command({
+      query: `
+        CREATE TABLE IF NOT EXISTS signals_analytics (
+          signal_id String,
+          entity_id String,
+          entity_name String,
+          entity_type String,
+          entity_sector String,
+          entity_version UInt32,
+          source_id String,
+          source_name String,
+          polarity String,
+          category String,
+          tier UInt8,
+          domains Array(String),
+          intensity Float64,
+          confidence Float64,
+          is_backfill UInt8,
+          corroboration_count UInt16,
+          published_at DateTime,
+          ingested_at DateTime,
+          updated_at DateTime
+        ) ENGINE = ReplacingMergeTree(updated_at)
+        PARTITION BY toYYYYMM(published_at)
+        ORDER BY (entity_id, polarity, published_at)
+      `,
+    });
+
+    await clickhouseClient.command({
+      query: `
+        CREATE TABLE IF NOT EXISTS source_health_metrics (
+          source_id String,
+          timestamp DateTime,
+          uptime_pct Float64,
+          avg_yield Float64,
+          dlq_rate Float64,
+          cost_per_signal Float64,
+          circuit_state String
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(timestamp)
+        ORDER BY (source_id, timestamp)
+      `,
+    });
+
     logger.info('ClickHouse tables initialized');
   } catch (err) {
     logger.warn({ err }, 'ClickHouse init failed — analytics will be unavailable');
