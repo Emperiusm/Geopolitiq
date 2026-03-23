@@ -305,6 +305,17 @@ Set to 10 minutes (2x Temporal's default 5-minute activity retry timeout). Uses 
 
 NATS gateway connections between clusters replicate streams with sub-second latency. No application code changes — NATS cluster config only.
 
+### NATS KV Store for Operational State
+
+NATS JetStream includes a built-in KV store. Use it for event-bus-adjacent state instead of Redis:
+
+- **Feature flags**: `gambit-flags` bucket. All pods watch for changes — instant propagation (<10ms) without Redis pub/sub polling.
+- **Degradation overrides**: `gambit-degradation` bucket. Admin sets override → all pods updated instantly.
+- **Consumer coordination**: `gambit-consumers` bucket. Leader election, offset tracking.
+
+Keep Redis for: cache, rate limiting, API key verification, session data, precomputed responses (data-heavy, high-throughput).
+Use NATS KV for: feature flags, degradation overrides, consumer coordination (lightweight, low-throughput, needs instant propagation).
+
 ### Docker Compose
 
 ```yaml
@@ -583,6 +594,15 @@ net.ipv4.tcp_tw_reuse = 1
 net.core.wmem_max = 2097152
 ```
 
+### WebSocket Upgrade Path
+
+The SSE gateway is designed as a dual-protocol gateway from the start. The `/stream` endpoint inspects the `Upgrade` header:
+
+- `Upgrade: websocket` → WebSocket (bidirectional, for future collaborative features)
+- No upgrade header → SSE (unidirectional, current implementation)
+
+Both protocols share the same NATS fan-out, connection management, auth refresh, and rate limiting. Only the transport differs. No additional service needed when bidirectional features ship in Phase 4/5. WebSocket handler is a stub in Phase 1.5 — returns `501 Not Implemented` until Phase 4.
+
 ### CDN Strategy
 
 | Endpoint | Cache TTL | Invalidation |
@@ -644,6 +664,15 @@ Large responses (signal feeds, exports) streamed via ReadableStream with cursor-
 
 `POST /engine/v1/batch` — up to 100 operations per request. Internal routing (reuse service layer, no self-HTTP). Query coalescing: 50 entity lookups → single `IN` query. Per-operation timeout (5s) with HTTP 207 Multi-Status for partial success. Counts as N requests against rate limit quota.
 
+### API Idempotency Keys
+
+Enterprise integrators retry failed POST/PUT requests after network timeouts. Without idempotency, retries can produce duplicates. `Idempotency-Key` header on all mutation endpoints:
+
+- Client sends `Idempotency-Key: <UUID>` with any POST/PUT/DELETE
+- First execution: response cached in Redis for 24 hours keyed by `idempotency:{teamId}:{key}`
+- Subsequent requests with same key: return cached response without re-executing
+- Optional — mutations work without the header, but Enterprise SDK generates keys automatically on retry
+
 ### Binary Protocol Option
 
 `Accept: application/msgpack` for Enterprise API integrators. 30-40% smaller, 5-10x faster parsing.
@@ -659,6 +688,10 @@ Dashboard requests with `X-Gambit-Client: signal-dashboard` get meta moved to re
 ### Encrypted Cursors
 
 AES-256-GCM encrypted cursor state. Prevents enumeration attacks and cursor manipulation. Daily key rotation.
+
+### Snapshot-Consistent Pagination
+
+Cursor-based pagination can produce inconsistent results during active ingestion (entity appears on multiple pages or disappears). Cursors include a snapshot timestamp from the first page fetch. Subsequent pages read as of the same snapshot via PostgreSQL's `SET TRANSACTION SNAPSHOT`. Snapshot expires after 5 minutes — client re-fetches page 1 for fresh data.
 
 ---
 
@@ -881,6 +914,18 @@ Every route annotated with `scopeGuard('global' | 'tenant' | 'mixed')`. CI test 
 3. **Per-team daily quota**: Free 100, Pro 10K, Enterprise unlimited
 4. **Per-endpoint**: batch 10/min, export 5/min, GraphQL 60/min
 
+### Request Priority Under Load
+
+When API pods reach high utilization, shed low-priority traffic first:
+
+| Utilization | Enterprise | Pro | Free |
+|-------------|-----------|-----|------|
+| < 80% | Admitted | Admitted | Admitted |
+| 80-90% | Admitted | Admitted | 50% shed → 503 |
+| 90%+ | Admitted | 50% shed → 503 | Always 503 |
+
+Enterprise customers experience zero degradation under load. 503 responses include `Retry-After` header and upgrade URL. Implemented as admission controller middleware checking per-pod active request count against tier-weighted thresholds.
+
 ### Account Takeover Detection
 
 - **Impossible travel**: request from US then Germany within 30 minutes → block + notify admin
@@ -903,6 +948,14 @@ Every route annotated with `scopeGuard('global' | 'tenant' | 'mixed')`. CI test 
 - Cost analysis per tier (Free 500, Pro 5000, Enterprise 50000)
 - Per-field cost weights (relatedSignals: 5x, basic lookups: 1x)
 - 10-second query timeout
+
+### GraphQL Persisted Queries
+
+Dashboard sends the same 10-15 queries on every page load. Register query hashes at build time:
+
+- Dashboard: sends `{ "extensions": { "persistedQuery": { "sha256Hash": "abc123" } } }` — pre-parsed, pre-validated, skip cost analysis
+- API customers (Pro+): full ad-hoc queries with cost analysis
+- Free tier: persisted queries only — zero attack surface, zero compute overhead
 
 ### Internal Service Authentication
 
@@ -1050,6 +1103,15 @@ Phase 5      Advanced Capabilities (+ GraphQL security, batch API, export)
 | H46 | Kernel tuning for SSE pods | SSE | Scale-triggered | 50K+ connections per pod |
 | H47 | Entity hot-tier in Redis | API | 3+ | 80% of traffic from Redis GET |
 | H48 | Compile-time route validation | API | 3+ | Catches errors before production |
+| H49 | Redis pipelining for batch cache invalidation | API | 100x latency reduction on batch invalidation | 1.5 |
+| H50 | ClickHouse async inserts | Event Bus | 5-10x consumer throughput increase | 1.5 |
+| H51 | PostgreSQL JIT for gap scoring | PostgreSQL | 2-5x speedup on aggregation queries | 3+ |
+| H52 | TCP_NODELAY on SSE connections | SSE | Consistent <5ms event delivery (vs 50-200ms with Nagle) | 1.5 |
+| H53 | Custom Brotli dictionary for API responses | API | 15-20% additional compression over generic Brotli | 3+ |
+| H54 | Zero-allocation SSE fan-out arrays | SSE | GC pauses drop from ~50ms to <5ms | 1.5 |
+| H55 | Query plan pinning via pg_hint_plan | PostgreSQL | Prevents plan regression after statistics change | 3+ |
+
+**55 hyper-optimizations** catalogued across all infrastructure layers.
 
 ---
 
@@ -1151,3 +1213,16 @@ Monthly restore test to staging.
 ### Backup Testing
 
 Monthly: restore daily backup to staging, verify data integrity, run smoke tests against restored database. Automated via Temporal scheduled workflow.
+
+### Migration Safety Linting
+
+CI test that blocks dangerous schema changes:
+
+- `ADD COLUMN NOT NULL` without `DEFAULT` (locks table, rewrites all rows)
+- `ALTER COLUMN TYPE` (full table rewrite)
+- `CREATE INDEX` without `CONCURRENTLY` (locks writes)
+- `DROP COLUMN` (ACCESS EXCLUSIVE lock)
+- Explicit `LOCK TABLE` statements
+- `RENAME TABLE` (breaks application code)
+
+Runs on every PR that touches migration files. Dangerous patterns fail the build with an explanation of the safe alternative.
