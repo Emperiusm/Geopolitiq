@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test Feed</title>
+    <item>
+      <title>Nvidia Reports Record Q4 Revenue</title>
+      <link>https://example.com/nvidia-q4</link>
+      <description>Nvidia posted record revenue in Q4 2026.</description>
+      <pubDate>Sat, 21 Mar 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>TSMC Expands Arizona Fab</title>
+      <link>https://example.com/tsmc-arizona</link>
+      <description>TSMC announces expansion of Arizona semiconductor facility.</description>
+      <pubDate>Fri, 20 Mar 2026 14:30:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
