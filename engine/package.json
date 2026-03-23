@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "seed": "bun src/seed/seed-from-mongo.ts",
+    "seed:feeds": "bun src/seed/feed-migration.ts",
     "worker:fetch": "bun src/pipeline/workers/fetch-worker.ts",
     "worker:parse-structured": "bun src/pipeline/workers/parse-structured-worker.ts",
     "worker:parse-agent": "bun src/pipeline/workers/parse-agent-worker.ts",
