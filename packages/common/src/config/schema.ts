@@ -29,6 +29,9 @@ export const configSchema = z.object({
     accessKey: z.string().default('gambit'),
     secretKey: z.string().default('gambit-dev'),
   }),
+  nats: z.object({
+    url: z.string().optional(),
+  }),
   auth: z.object({
     jwtSecret: z.string().default('gambit-dev-secret-change-in-production'),
   }),

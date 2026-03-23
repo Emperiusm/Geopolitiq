@@ -22,6 +22,7 @@ export function loadConfig() {
       accessKey: process.env.MINIO_ACCESS_KEY,
       secretKey: process.env.MINIO_SECRET_KEY,
     },
+    nats: { url: process.env.NATS_URL },
     auth: { jwtSecret: process.env.JWT_SECRET },
     log: { level: process.env.LOG_LEVEL },
   });

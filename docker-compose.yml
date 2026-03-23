@@ -393,6 +393,18 @@ services:
       - engine
       - all
 
+  nats:
+    image: nats:2.10-alpine
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    profiles:
+      - engine
+      - all
+
   # ═══════════════════════════════════════════════════
   # OBSERVABILITY PROFILE — OTel Collector, Tempo, Grafana
   # ═══════════════════════════════════════════════════
@@ -459,3 +471,4 @@ volumes:
   redis_persistent_data:
   caddy_data:
   grafana_data:
+  nats_data:

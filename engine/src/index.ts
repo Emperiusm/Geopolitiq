@@ -8,6 +8,9 @@ import { connectClickhouse } from './infrastructure/clickhouse';
 import { connectMinio, ensureBuckets } from './infrastructure/minio';
 import { connectTemporal } from './infrastructure/temporal';
 import { connectRedis } from './infrastructure/redis';
+import { connectNats, drainNats } from './infrastructure/nats';
+import { createEventBus } from './infrastructure/event-bus';
+import { createFeatureFlags } from './infrastructure/nats-kv';
 import { runDatabaseInit } from './db/init';
 import { initClickhouse } from './db/init/clickhouse';
 import { createServiceContainer } from './services/container';
@@ -43,7 +46,7 @@ async function boot() {
   await runDatabaseInit(db, logger);
 
   // 4. Connect optional services in parallel
-  const [typesense, clickhouse, minio, temporal, redisCache, redisPersistent] =
+  const [typesense, clickhouse, minio, temporal, redisCache, redisPersistent, nats] =
     await Promise.all([
       connectTypesense(config, logger),
       connectClickhouse(config, logger),
@@ -51,26 +54,35 @@ async function boot() {
       connectTemporal(config, logger),
       connectRedis(config.redis.cacheUrl, logger, 'cache'),
       connectRedis(config.redis.persistentUrl, logger, 'persistent'),
+      connectNats(config, logger),
     ]);
 
-  // 5. Configure Typesense synonyms (non-fatal)
+  // 5. Initialise NATS EventBus + feature flags (non-fatal)
+  const eventBus = createEventBus(nats, logger);
+  await eventBus.ensureStreams().catch((err) => {
+    logger.warn({ err }, 'Failed to ensure NATS streams');
+  });
+
+  const featureFlags = await createFeatureFlags(nats, logger);
+
+  // 7. Configure Typesense synonyms (non-fatal)
   if (typesense) {
     await configureSynonyms(typesense, logger).catch((err) => {
       logger.warn({ err }, 'Failed to configure Typesense synonyms');
     });
   }
 
-  // 6. Create MinIO buckets (non-fatal)
+  // 8. Create MinIO buckets (non-fatal)
   if (minio) {
     await ensureBuckets(minio, logger).catch((err) => {
       logger.warn({ err }, 'Failed to create MinIO buckets');
     });
   }
 
-  // 7. Init ClickHouse tables (non-fatal)
+  // 9. Init ClickHouse tables (non-fatal)
   await initClickhouse(clickhouse, logger);
 
-  // 8. Build service container
+  // 10. Build service container
   const authProvider = new PostgresAuthProvider(db);
   const cache = createCacheStack(redisCache, logger);
 
@@ -172,7 +184,12 @@ async function boot() {
       }
     }
 
-    // 2. Close Redis connections
+    // 2. Drain NATS (before DB pool — lets in-flight publishes complete)
+    if (nats) {
+      await drainNats(nats, logger);
+    }
+
+    // 3. Close Redis connections
     if (redisCache) {
       try {
         await redisCache.quit();
@@ -190,7 +207,7 @@ async function boot() {
       }
     }
 
-    // 3. Close ClickHouse
+    // 4. Close ClickHouse
     if (clickhouse) {
       try {
         await clickhouse.close();
@@ -200,7 +217,7 @@ async function boot() {
       }
     }
 
-    // 4. Close PostgreSQL (last — most critical)
+    // 5. Close PostgreSQL (last — most critical)
     try {
       await closePgPool();
       logger.info('PostgreSQL disconnected');
