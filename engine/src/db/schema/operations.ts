@@ -11,7 +11,7 @@ export const pipelineRuns = pgTable('pipeline_runs', {
   itemsProcessed: integer('items_processed').default(0),
   itemsFailed: integer('items_failed').default(0),
   error: text('error'),
-  sourceId: text('source_id'),
+  sourceId: text('source_id').references(() => sources.id),
   fetched: integer('fetched').default(0),
   parsed: integer('parsed').default(0),
   deduplicated: integer('deduplicated').default(0),
