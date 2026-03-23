@@ -27,7 +27,7 @@
 - [ ] [Task 8: Cache Strategy + CDN Integration](#task-8-cache-strategy--cdn-integration)
 - [ ] [Task 9: Observability Stack](#task-9-observability-stack)
 - [ ] [Task 10: Graceful Degradation](#task-10-graceful-degradation)
-- [ ] [Task 11: Security Hardening](#task-11-security-hardening)
+- [ ] [Task 11: Security Hardening + Rate Limiting](#task-11-security-hardening--rate-limiting)
 
 ---
 
@@ -47,7 +47,7 @@ Task 3 (PgCat) ─────┬──▶ Task 4 (Partitioning)
 Task 2 (Consumer Framework) ──▶ Task 6 (NATS Consumers)
 ```
 
-Tasks 1+2 and 3 can be built in parallel. Everything else flows from these.
+Task 1 and Task 3 can be built in parallel. Task 2 depends on Task 1. Everything else flows from these.
 
 ---
 
@@ -159,11 +159,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { connectNats, closeNats } from '../../src/infrastructure/nats';
 import { createLogger } from '@gambit/common';
 
-const logger = createLogger({ name: 'test-nats', level: 'silent' });
+const logger = createLogger('test');
 
 describe('NATS connection', () => {
   it('connects to NATS and gets JetStream context', async () => {
-    const nc = await connectNats({ natsUrl: 'nats://localhost:4222' }, logger);
+    const nc = await connectNats({ nats: { url: 'nats://localhost:4222' } }, logger);
     expect(nc).toBeDefined();
     expect(nc.jetstream).toBeDefined();
     expect(nc.jetstreamManager).toBeDefined();
@@ -171,7 +171,7 @@ describe('NATS connection', () => {
   });
 
   it('returns null when NATS is unreachable', async () => {
-    const nc = await connectNats({ natsUrl: 'nats://localhost:9999' }, logger);
+    const nc = await connectNats({ nats: { url: 'nats://localhost:9999' } }, logger);
     expect(nc).toBeNull();
   });
 });
@@ -191,7 +191,7 @@ Create `engine/src/infrastructure/nats.ts`:
 
 ```typescript
 import { connect, type NatsConnection, type JetStreamClient, type JetStreamManager } from 'nats';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 
 export interface NatsContext {
   connection: NatsConnection;
@@ -200,12 +200,12 @@ export interface NatsContext {
 }
 
 export async function connectNats(
-  config: { natsUrl: string },
+  config: { nats: { url: string } },
   logger: Logger,
 ): Promise<NatsContext | null> {
   try {
     const nc = await connect({
-      servers: config.natsUrl,
+      servers: config.nats.url,
       name: 'gambit-engine',
       reconnect: true,
       maxReconnectAttempts: -1, // infinite
@@ -215,10 +215,10 @@ export async function connectNats(
     const js = nc.jetstream();
     const jsm = await nc.jetstreamManager();
 
-    logger.info({ server: config.natsUrl }, 'NATS JetStream connected');
+    logger.info({ server: config.nats.url }, 'NATS JetStream connected');
     return { connection: nc, jetstream: js, jetstreamManager: jsm };
   } catch (err) {
-    logger.warn({ err, server: config.natsUrl }, 'NATS connection failed — event bus unavailable');
+    logger.warn({ err, server: config.nats.url }, 'NATS connection failed — event bus unavailable');
     return null;
   }
 }
@@ -298,12 +298,12 @@ import { STREAMS } from '../../src/infrastructure/event-schemas';
 import { createLogger } from '@gambit/common';
 import { ulid } from 'ulid';
 
-const logger = createLogger({ name: 'test-event-bus', level: 'silent' });
+const logger = createLogger('test');
 let nats: NatsContext;
 let bus: NatsEventBus;
 
 beforeAll(async () => {
-  nats = (await connectNats({ natsUrl: 'nats://localhost:4222' }, logger))!;
+  nats = (await connectNats({ nats: { url: 'nats://localhost:4222' } }, logger))!;
   bus = new NatsEventBus(nats, logger);
   await bus.ensureStreams();
 });
@@ -352,7 +352,7 @@ Create `engine/src/infrastructure/event-bus.ts`:
 
 ```typescript
 import { type JetStreamClient, type JetStreamManager, StringCodec, headers as natsHeaders } from 'nats';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import type { NatsContext } from './nats';
 import { STREAMS, type DomainEvent } from './event-schemas';
 
@@ -441,7 +441,7 @@ Create `engine/src/infrastructure/nats-kv.ts`:
 
 ```typescript
 import type { KV, NatsConnection } from 'nats';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import type { NatsContext } from './nats';
 
 export class NatsFeatureFlags {
@@ -506,7 +506,7 @@ import { NatsEventBus, NoopEventBus } from './infrastructure/event-bus';
 import { NatsFeatureFlags } from './infrastructure/nats-kv';
 
 // In startup sequence:
-const nats = await connectNats({ natsUrl: config.natsUrl ?? 'nats://localhost:4222' }, logger);
+const nats = await connectNats(config, logger);
 const eventBus = nats ? new NatsEventBus(nats, logger) : new NoopEventBus();
 if (nats) await eventBus.ensureStreams();
 
@@ -514,10 +514,10 @@ const featureFlags = new NatsFeatureFlags(nats, logger);
 await featureFlags.init();
 ```
 
-Add `natsUrl` to the config schema in `packages/common/src/config/schema.ts`:
+Add `nats` to the config schema in `packages/common/src/config/schema.ts`:
 
 ```typescript
-natsUrl: z.string().url().default('nats://localhost:4222'),
+nats: z.object({ url: z.string().default('nats://localhost:4222') }).default({}),
 ```
 
 Add `eventBus` and `featureFlags` to the `ServiceContainer` interface in `engine/src/services/container.ts`.
@@ -575,7 +575,7 @@ import type { DomainEvent } from '../../src/infrastructure/event-schemas';
 import { createLogger } from '@gambit/common';
 import { ulid } from 'ulid';
 
-const logger = createLogger({ name: 'test-consumer', level: 'silent' });
+const logger = createLogger('test');
 let nats: NatsContext;
 let bus: NatsEventBus;
 
@@ -604,7 +604,7 @@ class TestConsumer extends BaseConsumer {
 }
 
 beforeAll(async () => {
-  nats = (await connectNats({ natsUrl: 'nats://localhost:4222' }, logger))!;
+  nats = (await connectNats({ nats: { url: 'nats://localhost:4222' } }, logger))!;
   bus = new NatsEventBus(nats, logger);
   await bus.ensureStreams();
 });
@@ -650,11 +650,13 @@ Expected: FAIL — `BaseConsumer` not defined.
 
 - [ ] **Step 3: Implement BaseConsumer**
 
+Note: The existing `CircuitBreaker` has a zero-arg constructor. If a named/logged breaker is needed, extend the class later. For now, use the default constructor.
+
 Create `engine/src/consumers/base-consumer.ts`:
 
 ```typescript
 import { type JetStreamClient, type JetStreamPullSubscription, type JsMsg, AckPolicy, DeliverPolicy, StringCodec } from 'nats';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import type { NatsContext } from '../infrastructure/nats';
 import type { NatsEventBus } from '../infrastructure/event-bus';
 import type { DomainEvent } from '../infrastructure/event-schemas';
@@ -684,7 +686,7 @@ export abstract class BaseConsumer {
   constructor(config: ConsumerConfig) {
     this.config = config;
     this.logger = config.logger.child({ consumer: config.consumerName });
-    this.breaker = new CircuitBreaker(config.consumerName, config.logger);
+    this.breaker = new CircuitBreaker();
   }
 
   abstract handleBatch(events: DomainEvent[]): Promise<void>;
@@ -902,10 +904,9 @@ Modify `engine/src/infrastructure/postgres.ts` to export three pool accessors:
 ```typescript
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import type { Logger } from 'pino';
-import * as schema from '../db/schema';
+import type { Logger } from '@gambit/common';
 
-export type DrizzleClient = PostgresJsDatabase<typeof schema>;
+export type DrizzleClient = PostgresJsDatabase<Record<string, never>>;
 
 let writePool: ReturnType<typeof postgres> | null = null;
 let readPool: ReturnType<typeof postgres> | null = null;
@@ -925,12 +926,12 @@ export async function connectPostgres(
 
   // Write pool — always points to primary (via PgCat)
   writePool = postgres(config.databaseUrl, poolOpts);
-  writeDb = drizzle(writePool, { schema });
+  writeDb = drizzle(writePool);
 
   // Read pool — same URL in dev (single PG), separate in prod
   const readUrl = config.databaseReadUrl ?? config.databaseUrl;
   readPool = postgres(readUrl, { ...poolOpts, max: 30 });
-  readDb = drizzle(readPool, { schema });
+  readDb = drizzle(readPool);
 
   // Warm connections
   await Promise.all([
@@ -1057,7 +1058,7 @@ Create `engine/src/db/init/partitions.ts`:
 ```typescript
 import type { DrizzleClient } from '../../infrastructure/postgres';
 import { sql } from 'drizzle-orm';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 
 export async function initPartitions(db: DrizzleClient, logger: Logger): Promise<void> {
   // Enable pg_partman extension
@@ -1087,6 +1088,12 @@ export async function initPartitions(db: DrizzleClient, logger: Logger): Promise
 
   // Fresh database — create partitioned table directly
   // This happens on first init (no existing data to migrate)
+  // Note: For fresh databases, the signals table must first be created by Drizzle migrations
+  // as a regular table, then this init converts it. The `pg_partman.create_parent()` call
+  // handles the conversion. If the Drizzle migration already created a regular signals table,
+  // this path will not be reached (the `relkind === 'r'` branch above handles it). For truly
+  // fresh databases where no migration has run, pg_partman requires the table to already exist
+  // with `PARTITION BY RANGE`. This is handled by running Drizzle migrations before `initPartitions()`.
   logger.info('Creating partitioned signals table');
 
   await db.execute(sql`
@@ -1170,7 +1177,7 @@ import type { NatsFeatureFlags } from '../../infrastructure/nats-kv';
 import type { ResolvedSignal, SourceConfig } from '../types';
 import { SSEManager } from '../../events/sse-manager';
 import { ulid } from 'ulid';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 
 export function createPublishActivity(
   eventBus: EventBus,
@@ -1203,13 +1210,13 @@ export function createPublishActivity(
     };
 
     if (featureFlags.isEnabled('nats.publish.enabled', true)) {
-      await eventBus.publish('SIGNALS', `signals.ingested.${source.id}`, event);
+      await eventBus.publish('SIGNALS', `signals.ingested.${signal.entityId}`, event);
     } else {
       // Fallback: direct SSE publish (pre-NATS behavior)
       try {
         const { default: Redis } = await import('ioredis');
         const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6381');
-        const sse = new SSEManager(redis, logger);
+        const sse = new SSEManager(redis);
         await sse.publishSignalIngested(signal, source);
         await redis.quit();
       } catch {
@@ -1324,7 +1331,7 @@ Create `engine/src/consumers/clickhouse-sync.ts`:
 ```typescript
 import { BaseConsumer } from './base-consumer';
 import type { DomainEvent } from '../infrastructure/event-schemas';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import type { NatsContext } from '../infrastructure/nats';
 import type { NatsEventBus } from '../infrastructure/event-bus';
 
@@ -1388,7 +1395,7 @@ Create `engine/src/consumers/neo4j-sync.ts`:
 ```typescript
 import { BaseConsumer } from './base-consumer';
 import type { DomainEvent } from '../infrastructure/event-schemas';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import type { NatsContext } from '../infrastructure/nats';
 import type { NatsEventBus } from '../infrastructure/event-bus';
 
@@ -1461,7 +1468,7 @@ Create `engine/src/consumers/typesense-sync.ts`:
 ```typescript
 import { BaseConsumer } from './base-consumer';
 import type { DomainEvent } from '../infrastructure/event-schemas';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import type { NatsContext } from '../infrastructure/nats';
 import type { NatsEventBus } from '../infrastructure/event-bus';
 
@@ -1515,7 +1522,7 @@ Create `engine/src/consumers/cache-invalidator.ts`:
 ```typescript
 import { BaseConsumer } from './base-consumer';
 import type { DomainEvent } from '../infrastructure/event-schemas';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import type { NatsContext } from '../infrastructure/nats';
 import type { NatsEventBus } from '../infrastructure/event-bus';
 
@@ -1555,7 +1562,7 @@ export class CacheInvalidatorConsumer extends BaseConsumer {
       // Invalidate entity cache
       pipeline.del(`entity:${entityId}`);
       pipeline.del(`gap:${entityId}`);
-      pipeline.del(`signals:${entityId}:*`);
+      pipeline.del(`signals:${entityId}`);
 
       // Broadcast L1 invalidation to all API pods
       pipeline.publish('cache.invalidate', JSON.stringify({
@@ -1588,10 +1595,10 @@ import { loadConfig, createLogger } from '@gambit/common';
 import neo4j from 'neo4j-driver';
 
 const config = loadConfig();
-const logger = createLogger({ name: 'consumers' });
+const logger = createLogger('consumers');
 
 async function main() {
-  const nats = await connectNats({ natsUrl: config.natsUrl }, logger);
+  const nats = await connectNats(config, logger);
   if (!nats) {
     logger.fatal('Cannot start consumers without NATS');
     process.exit(1);
@@ -1779,7 +1786,7 @@ export class SSEFanout {
 Create `engine/src/sse-gateway/connection-manager.ts`:
 
 ```typescript
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 
 const MAX_CONNECTIONS: Record<string, number> = {
   pro: 25,
@@ -1835,7 +1842,7 @@ import { loadConfig, createLogger } from '@gambit/common';
 import type { DomainEvent } from '../infrastructure/event-schemas';
 
 const config = loadConfig();
-const logger = createLogger({ name: 'sse-gateway' });
+const logger = createLogger('sse-gateway');
 const sc = StringCodec();
 
 const fanout = new SSEFanout();
@@ -1897,12 +1904,17 @@ app.get('/stream', async (c) => {
 async function startNatsFanout(nats: NatsContext) {
   const js = nats.jetstream;
 
-  for (const stream of ['SIGNALS', 'GAP_SCORES', 'ALERTS']) {
-    const sub = await js.subscribe(`${stream.toLowerCase()}.>`, {
+  const STREAM_SUBJECTS = [
+    { stream: 'SIGNALS', subject: 'signals.>' },
+    { stream: 'GAP_SCORES', subject: 'gaps.>' },
+    { stream: 'ALERTS', subject: 'alerts.>' },
+  ];
+  for (const { stream, subject } of STREAM_SUBJECTS) {
+    const sub = await js.subscribe(subject, {
       stream,
       config: {
         deliver_policy: DeliverPolicy.New,
-        durable_name: `sse-gateway-${process.pid}`, // per-pod consumer
+        // Ephemeral consumer — no durable state needed for SSE fan-out
       },
     });
 
@@ -1931,7 +1943,7 @@ async function startNatsFanout(nats: NatsContext) {
 
 // Main
 async function main() {
-  const nats = await connectNats({ natsUrl: config.natsUrl }, logger);
+  const nats = await connectNats(config, logger);
   if (nats) await startNatsFanout(nats);
 
   const port = parseInt(process.env.SSE_GATEWAY_PORT ?? '3002');
@@ -2423,6 +2435,12 @@ pyroscope:
   ports:
     - "4040:4040"
   profiles: ["observability", "all"]
+
+tempo:
+  image: grafana/tempo:latest
+  ports:
+    - "3200:3200"
+  profiles: ["observability", "all"]
 ```
 
 - [ ] **Step 5: Create Prometheus scrape config**
@@ -2517,7 +2535,7 @@ import { describe, it, expect } from 'vitest';
 import { DegradationRegistry } from '../../src/infrastructure/degradation';
 import { createLogger } from '@gambit/common';
 
-const logger = createLogger({ name: 'test', level: 'silent' });
+const logger = createLogger('test');
 
 describe('DegradationRegistry', () => {
   it('reports healthy when all services are up', () => {
@@ -2547,7 +2565,7 @@ describe('DegradationRegistry', () => {
 Create `engine/src/infrastructure/degradation.ts`:
 
 ```typescript
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 import { CircuitBreaker } from '../health/circuit-breaker';
 
 export type ServiceName = 'clickhouse' | 'neo4j' | 'typesense' | 'nats' | 'redis' | 'temporal' | 'minio';
@@ -2564,7 +2582,7 @@ export class DegradationRegistry {
     // Initialize circuit breakers for each service
     const services: ServiceName[] = ['clickhouse', 'neo4j', 'typesense', 'nats', 'redis', 'temporal', 'minio'];
     for (const service of services) {
-      this.breakers.set(service, new CircuitBreaker(service, logger));
+      this.breakers.set(service, new CircuitBreaker());
     }
   }
 
@@ -2674,6 +2692,18 @@ export function createHealthRoutes(degradation: DegradationRegistry) {
     }, allHealthy ? 200 : 207);
   });
 
+  // Backward compatible: /health still works (same logic as /health/ready)
+  health.get('/', async (c) => {
+    try {
+      const { getDb } = await import('../infrastructure/postgres');
+      const db = getDb();
+      await db.execute({ sql: 'SELECT 1', params: [] });
+      return c.json({ ready: true });
+    } catch {
+      return c.json({ ready: false, reason: 'postgresql_unreachable' }, 503);
+    }
+  });
+
   return health;
 }
 ```
@@ -2716,7 +2746,7 @@ git add -A && git commit -m "feat(engine): add graceful degradation registry + t
 
 ---
 
-## Task 11: Security Hardening
+## Task 11: Security Hardening + Rate Limiting
 
 **Goal:** Implement 4-layer tenant isolation, ES256 JWT, Argon2id API keys, webhook SSRF prevention, audit log, scope guards, and RLS audit tests.
 
@@ -2943,7 +2973,7 @@ import { sql } from 'drizzle-orm';
 
 const TENANT_SCOPED_TABLES = [
   'watchlists', 'alerts', 'webhook_endpoints',
-  'webhook_deliveries', 'usage_records', 'api_keys',
+  'webhook_deliveries', 'usage_records', 'api_keys', 'foia_requests',
 ];
 
 describe('RLS audit', () => {
@@ -2982,11 +3012,11 @@ Create `engine/src/db/init/roles.ts`:
 ```typescript
 import { sql } from 'drizzle-orm';
 import type { DrizzleClient } from '../../infrastructure/postgres';
-import type { Logger } from 'pino';
+import type { Logger } from '@gambit/common';
 
 export async function initRoles(db: DrizzleClient, logger: Logger): Promise<void> {
   // Only create roles if they don't exist (idempotent)
-  const roles = ['gambit_api', 'gambit_ingest'];
+  const roles = ['gambit_api', 'gambit_ingest', 'gambit_migrate'];
 
   for (const role of roles) {
     const exists = await db.execute(sql`
@@ -3010,6 +3040,9 @@ export async function initRoles(db: DrizzleClient, logger: Logger): Promise<void
   await db.execute(sql.raw(`
     GRANT SELECT, INSERT, UPDATE ON entities, signals, sources, pipeline_runs, resolution_aliases TO gambit_ingest;
   `));
+
+  // gambit_migrate: full access for running migrations
+  await db.execute(sql.raw('GRANT ALL ON ALL TABLES IN SCHEMA public TO gambit_migrate'));
 
   logger.info('Database roles configured');
 }
@@ -3035,6 +3068,52 @@ git add -A && git commit -m "feat(engine): add security hardening — SSRF preve
 - DB role separation: gambit_api (RLS), gambit_ingest (shared only)
 - Security headers: ready for middleware composition"
 ```
+
+- [ ] **Step 11: Implement 4-layer rate limiting**
+
+Note: The existing `engine/src/middleware/rate-limit.ts` provides per-team rate limiting (Layer 3). Extend it with three additional layers:
+
+Create `engine/src/middleware/priority-admission.ts` with tier-based load shedding under load:
+
+```typescript
+import type { Context, Next } from 'hono';
+
+const TIER_PRIORITY: Record<string, number> = {
+  enterprise: 3,
+  pro: 2,
+  free: 1,
+};
+
+const LOAD_THRESHOLD = 0.85; // shed low-priority traffic above 85% capacity
+
+export function priorityAdmission(getLoadFactor: () => number) {
+  return async (c: Context, next: Next) => {
+    const tier = c.get('tier') ?? 'free';
+    const priority = TIER_PRIORITY[tier] ?? 1;
+    const load = getLoadFactor();
+
+    // Under threshold: allow all traffic
+    if (load < LOAD_THRESHOLD) {
+      await next();
+      return;
+    }
+
+    // Shed traffic based on tier priority
+    // At 85% load: shed free tier
+    // At 92% load: shed pro tier
+    // At 98% load: shed enterprise tier (should never happen)
+    const shedThreshold = LOAD_THRESHOLD + (priority - 1) * 0.07;
+    if (load >= shedThreshold && priority < 3) {
+      c.header('Retry-After', '5');
+      return c.json({ error: 'Service under load — please retry', retryAfter: 5 }, 503);
+    }
+
+    await next();
+  };
+}
+```
+
+Wire into the middleware stack in `engine/src/index.ts` alongside the existing rate limiter.
 
 ---
 
