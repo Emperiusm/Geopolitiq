@@ -92,6 +92,7 @@
 | Prometheus | Metrics aggregation | `prom/prometheus` | Prometheus Operator |
 | Loki + Promtail | Log aggregation | `grafana/loki` | Loki Helm chart |
 | Pyroscope | Continuous profiling | `grafana/pyroscope` | Single Deployment |
+| Argo Rollouts | Canary deployment controller | N/A (not in dev) | K8s CRD |
 
 ### Scale Targets
 
@@ -151,6 +152,8 @@ Temporal Workflow (ingestion)
                   ├── Consumer: health-monitor
                   └── Consumer: usage-aggregator
 ```
+
+> `email-dispatcher` is a Phase 3b deliverable — included in the stream topology for completeness but not implemented in Phase 1.5.
 
 ### Stream & Subject Topology
 
@@ -255,9 +258,13 @@ SIGNALS stream:
 
 Real-time consumers read from memory replica (sub-millisecond). Batch consumers read from file-backed source.
 
+> **Note:** The R1 memory replica is a best-effort latency optimization. If a consumer restarts while R1 is unavailable, it falls back to R0 (file-backed) and may see slightly delayed delivery rather than message loss. The R0 stream is the durability guarantee.
+
 ### Consumer Circuit Breakers
 
 Each consumer wraps its handler in the existing circuit breaker from `engine/src/health/circuit-breaker.ts`. When circuit opens (e.g., ClickHouse down), consumer stops pulling. NATS buffers messages. When circuit closes, consumer resumes and drains backlog. No messages lost, no retry storms.
+
+> **Note:** The existing `CircuitBreaker` at `engine/src/health/circuit-breaker.ts` will be extended with a `recordSuccess()` method and a public `state` getter for use in the consumer framework. The `recordFailure()` signature will accept an optional `FailureClass` argument (defaulting to `'transient'` for NATS consumer retries).
 
 ```typescript
 async function consumeWithCircuitBreaker(
@@ -345,13 +352,13 @@ nats:
 ### Connection Budget (Little's Law)
 
 ```
-Dashboard pod: 500 req/s × 5ms avg = 2.5 → 5 connections
-API pod: 200 req/s × 15ms avg = 3 → 5 connections
-Worker pod: 50 writes/s × 10ms avg = 0.5 → 2 connections
-NATS consumer pod: 100 batch/s × 20ms avg = 2 → 3 connections
+Dashboard/API pods (20): 500 req/s × 5ms = 5 connections
+SSE Gateway pods (10): auth check + state hydration = 2 connections
+Worker pods (5): 50 writes/s × 10ms = 2 connections
+NATS consumer pods (3): 100 batch/s × 20ms = 3 connections
 
-Total: (20 × 5) + (5 × 2) + (3 × 3) = 119 client connections
-→ multiplexed to 110 PostgreSQL connections across primary + replicas
+Total: (20 × 5) + (10 × 2) + (5 × 2) + (3 × 3) = 139 client connections
+→ multiplexed to ~120 PostgreSQL connections across primary + replicas
 ```
 
 ### Three-Tier Pool Separation
@@ -371,6 +378,17 @@ statement_timeout = 10000
 ```
 
 Guarantees that leaderboard aggregations can't starve entity-by-ID lookups.
+
+### Pool-to-Upstream Mapping
+
+| Pool | Upstream | Server-side connections |
+|------|----------|----------------------|
+| gambit_fast_read | Replica 1, Replica 2 (load balanced) | 15 per replica = 30 |
+| gambit_slow_read | Replica 1, Replica 2 (load balanced) | 8 per replica = 16 |
+| gambit_write | Primary only | 20 |
+| **Total** | | **66 server-side connections** |
+
+PostgreSQL `max_connections` on each instance should be set to at least 80 (66 + headroom for migrations, monitoring, manual connections).
 
 ### Application-Level Routing
 
@@ -452,7 +470,7 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO gambit_migrate;
 - **Covering indexes**: leaderboard and entity detail return from index without heap fetch
 - **Adaptive work_mem**: `SET LOCAL work_mem = '256MB'` for gap scoring transactions only
 - **Async commit**: `SET LOCAL synchronous_commit = 'off'` for usage records, search analytics
-- **UNLOGGED tables**: pipeline_runs, sync_dlq, search_analytics (2-5x faster writes)
+- **UNLOGGED tables**: search_analytics (2-5x faster writes). Note: `pipeline_runs` and `sync_dlq` remain LOGGED — pipeline runs are the audit trail for ingestion debugging, and DLQ entries must survive crashes to prevent silent data loss.
 - **pg_stat_statements + auto_explain**: query profiling with alert on p99 > 50ms
 - **pg_hint_plan**: force optimal plans on 3-5 hottest queries where planner errs
 
@@ -465,9 +483,9 @@ CloudNativePG auto-promotes replica within 5-10 seconds. PgCat health checks det
 ```typescript
 process.on('SIGTERM', async () => {
   server.close();                     // stop accepting
-  await pool.drain({ timeout: 25_000 }); // drain in-flight
+  await natsConnection.drain();       // finish in-flight NATS messages (needs DB)
+  await pool.drain({ timeout: 25_000 }); // drain remaining DB queries
   await pool.end();                   // close connections
-  await natsConnection.drain();       // flush NATS buffer
   process.exit(0);
 });
 ```
@@ -576,7 +594,7 @@ net.core.wmem_max = 2097152
 | `GET /domains` | 3600s | Manual purge (rarely changes) |
 | Tenant-scoped endpoints | Never at CDN | Redis cache only |
 
-Cache-Control headers with `stale-while-revalidate`. Vary by `Authorization, Accept-Encoding`.
+Cache-Control headers with `stale-while-revalidate`. CDN-cached endpoints (entity list, leaderboard, domains) are public/global data — `Vary: Accept-Encoding` only. Tenant-scoped endpoints are never CDN-cached and use `Vary: Authorization, Accept-Encoding` at the application cache layer.
 
 CDN purge via NATS consumer with 10-second debounce (100 signals for same entity → 1 purge).
 
@@ -832,12 +850,15 @@ Per-tier concurrency limits (concurrent queries), query cost budgets (weighted p
 
 Per-team data encryption keys (DEK) encrypted by master key (KEK) in Vault. Applied to: webhook secrets, webhook URLs, FOIA requester info. AES-256-GCM with per-value IV. Enables cryptographic erasure for GDPR — delete DEK and all encrypted tenant data becomes unrecoverable.
 
+In development, a static KEK from the `GAMBIT_DEV_KEK` environment variable replaces Vault. The `TenantEncryption` class detects the absence of Vault and falls back to the env-based KEK automatically.
+
 ### API Key Security
 
 - **Format**: `gbt_{tier}_{random}` (prefix for fast lookup without hash)
 - **Storage**: Argon2id hash (19MB memory cost, 2 iterations) — offline brute-force impractical
 - **Lookup**: prefix-based DB query → Argon2id verify → Redis verification cache (5 min TTL)
 - **Bloom filter pre-check**: 1μs rejection of invalid keys without any I/O (100K keys, 0.01% false positive)
+  The Bloom filter is rebuilt on startup from the `api_keys` table and incrementally updated via NATS `system.apikey.created` events. A newly created key is immediately added to all pods' filters.
 - **Rotation**: new key created, old key gets 24h grace period. Zero-downtime rotation.
 
 ### JWT Hardening
@@ -968,60 +989,67 @@ Phase 5      Advanced Capabilities (+ GraphQL security, batch API, export)
 
 **Phase 5:** GraphQL with depth/cost limits. Batch API with internal routing. Export via slow read pool.
 
+### Phase 3a Integration Contract
+
+- **Gap recompute trigger:** NATS subject `signals.ingested.*` replaces the Redis sorted set (`gap:pending`) polling approach in Phase 3a
+- **Gap score SSE events:** NATS `gaps.recomputed.*` replaces the existing Redis Pub/Sub SSE system (`SSE_CHANNELS`)
+- **ClickHouse fallback:** Phase 3a's `ClickHouseSignalReader`/`PostgresSignalReader` fallback is subsumed by the DegradationRegistry — Phase 3a reads from the registry to decide which reader to use
+- **Explicit note:** Phase 3a's implementation plan must be updated after Phase 1.5 lands to reflect these interface changes
+
 ---
 
 ## 8. Hyper-Optimization Registry
 
-| ID | Name | Section | Impact |
-|----|------|---------|--------|
-| H1 | Payload minimization (IDs + diff) | Event Bus | 90% NATS storage reduction |
-| H2 | Header-based routing without deserialization | Event Bus | Filter without parsing |
-| H3 | Tiered stream storage (memory + file-backed) | Event Bus | Sub-ms SSE delivery |
-| H4 | Consumer prefetch tuning per service | Event Bus | Optimal batch sizes |
-| H5 | Zstd compression for bulk events | Event Bus | 70% size reduction on backfills |
-| H6 | Dedup window = 2x Temporal retry window | Event Bus | Prevents duplicate events |
-| H7 | Consumer-side circuit breakers | Event Bus | No retry storms |
-| H8 | NATS superclusters for multi-region | Event Bus | Sub-10ms global delivery |
-| H9 | Prepared statement caching (top 20) | PostgreSQL | Eliminates parse/plan overhead |
-| H10 | Covering indexes for hot queries | PostgreSQL | Index-only scans |
-| H11 | pg_stat_statements + auto_explain | PostgreSQL | Query regression detection |
-| H12 | Connection warmup on pod startup | PostgreSQL | Zero cold-start latency |
-| H13 | Adaptive work_mem per transaction | PostgreSQL | Gap scoring in-memory |
-| H14 | HOT updates with tuned fillfactor | PostgreSQL | Counter updates skip index maintenance |
-| H15 | UNLOGGED tables for ephemeral data | PostgreSQL | 2-5x faster writes |
-| H16 | Async commit for non-critical writes | PostgreSQL | Eliminates fsync for usage |
-| H17 | 3-tier connection pools | PostgreSQL | Slow queries can't starve fast reads |
-| H18 | Columnar storage for cold partitions | PostgreSQL | 8:1 compression |
-| H19 | Partial indexes for 90% query pattern | PostgreSQL | 40-60% smaller indexes |
-| H20 | pg_hint_plan for critical paths | PostgreSQL | Force optimal plans |
-| H21 | ETag content-hash for 304 responses | API | 30-50% zero-transfer |
-| H22 | Streaming JSON for large responses | API | Constant memory |
-| H23 | Request coalescing for thundering herd | API | 10K users = 1 DB query |
-| H24 | HTTP/2 preload hints | API | 4 requests → 1 round-trip |
-| H25 | SSE delta compression | SSE | 60-80% bandwidth reduction |
-| H26 | SSE multiplexing (1 consumer per pod) | SSE | 1,666x NATS overhead reduction |
-| H27 | MessagePack binary protocol | API | 30-40% smaller, 10x faster parse |
-| H28 | Encrypted cursors | API | Prevents enumeration |
-| H29 | Envelope stripping for first-party | API | 200 bytes/response savings |
-| H30 | Adaptive SSE quality by connection health | SSE | 80% smaller for mobile |
-| H31 | Adaptive trace sampling during incidents | Observability | 100% visibility when needed |
-| H32 | Metric cardinality control | Observability | Prevents Prometheus OOM |
-| H33 | Exemplars (metrics → traces) | Observability | One-click drill-down |
-| H34 | Synthetic monitoring from 3+ regions | Observability | External reachability |
-| H35 | Log sampling with error-rate escalation | Observability | 100x volume reduction |
-| H36 | Pre-built incident dashboards | Observability | Sub-2-min diagnosis |
-| H37 | JWT verification caching | Security | Near-zero CPU for repeat tokens |
-| H38 | RLS context via connection variable | Security | Eliminates 1 round-trip/request |
-| H39 | Bloom filter for API key pre-check | Security | 1μs invalid key rejection |
-| H40 | Request fingerprinting (HyperLogLog) | Security | 12KB abuse detection |
-| H41 | Timing-safe comparisons | Security | Prevents timing attacks |
-| H42 | Cryptographic erasure for GDPR | Security | No backup purge needed |
-| H43 | Security headers hardening | Security | Defense in depth |
-| H44 | Precomputed API responses | API | Zero-compute leaderboard |
-| H45 | PostgreSQL pipeline mode for batch | PostgreSQL | 94% batch latency reduction |
-| H46 | Kernel tuning for SSE pods | SSE | 50K+ connections per pod |
-| H47 | Entity hot-tier in Redis | API | 80% of traffic from Redis GET |
-| H48 | Compile-time route validation | API | Catches errors before production |
+| ID | Name | Section | Phase | Impact |
+|----|------|---------|-------|--------|
+| H1 | Payload minimization (IDs + diff) | Event Bus | 1.5 | 90% NATS storage reduction |
+| H2 | Header-based routing without deserialization | Event Bus | 1.5 | Filter without parsing |
+| H3 | Tiered stream storage (memory + file-backed) | Event Bus | 1.5 | Sub-ms SSE delivery |
+| H4 | Consumer prefetch tuning per service | Event Bus | 1.5 | Optimal batch sizes |
+| H5 | Zstd compression for bulk events | Event Bus | 1.5 | 70% size reduction on backfills |
+| H6 | Dedup window = 2x Temporal retry window | Event Bus | 1.5 | Prevents duplicate events |
+| H7 | Consumer-side circuit breakers | Event Bus | 1.5 | No retry storms |
+| H8 | NATS superclusters for multi-region | Event Bus | Scale-triggered | Sub-10ms global delivery |
+| H9 | Prepared statement caching (top 20) | PostgreSQL | 1.5 | Eliminates parse/plan overhead |
+| H10 | Covering indexes for hot queries | PostgreSQL | 1.5 | Index-only scans |
+| H11 | pg_stat_statements + auto_explain | PostgreSQL | 1.5 | Query regression detection |
+| H12 | Connection warmup on pod startup | PostgreSQL | 1.5 | Zero cold-start latency |
+| H13 | Adaptive work_mem per transaction | PostgreSQL | 1.5 | Gap scoring in-memory |
+| H14 | HOT updates with tuned fillfactor | PostgreSQL | 1.5 | Counter updates skip index maintenance |
+| H15 | UNLOGGED tables for ephemeral data | PostgreSQL | 1.5 | 2-5x faster writes |
+| H16 | Async commit for non-critical writes | PostgreSQL | 1.5 | Eliminates fsync for usage |
+| H17 | 3-tier connection pools | PostgreSQL | 1.5 | Slow queries can't starve fast reads |
+| H18 | Columnar storage for cold partitions | PostgreSQL | 3+ | 8:1 compression |
+| H19 | Partial indexes for 90% query pattern | PostgreSQL | 1.5 | 40-60% smaller indexes |
+| H20 | pg_hint_plan for critical paths | PostgreSQL | 3+ | Force optimal plans |
+| H21 | ETag content-hash for 304 responses | API | 1.5 | 30-50% zero-transfer |
+| H22 | Streaming JSON for large responses | API | 1.5 | Constant memory |
+| H23 | Request coalescing for thundering herd | API | 1.5 | 10K users = 1 DB query |
+| H24 | HTTP/2 preload hints | API | 3+ | 4 requests → 1 round-trip |
+| H25 | SSE delta compression | SSE | 3+ | 60-80% bandwidth reduction |
+| H26 | SSE multiplexing (1 consumer per pod) | SSE | 1.5 | 1,666x NATS overhead reduction |
+| H27 | MessagePack binary protocol | API | 3+ | 30-40% smaller, 10x faster parse |
+| H28 | Encrypted cursors | API | 3+ | Prevents enumeration |
+| H29 | Envelope stripping for first-party | API | 3+ | 200 bytes/response savings |
+| H30 | Adaptive SSE quality by connection health | SSE | 3+ | 80% smaller for mobile |
+| H31 | Adaptive trace sampling during incidents | Observability | 1.5 | 100% visibility when needed |
+| H32 | Metric cardinality control | Observability | 1.5 | Prevents Prometheus OOM |
+| H33 | Exemplars (metrics → traces) | Observability | 3+ | One-click drill-down |
+| H34 | Synthetic monitoring from 3+ regions | Observability | 3+ | External reachability |
+| H35 | Log sampling with error-rate escalation | Observability | 1.5 | 100x volume reduction |
+| H36 | Pre-built incident dashboards | Observability | 1.5 | Sub-2-min diagnosis |
+| H37 | JWT verification caching | Security | 1.5 | Near-zero CPU for repeat tokens |
+| H38 | RLS context via connection variable | Security | 1.5 | Eliminates 1 round-trip/request |
+| H39 | Bloom filter for API key pre-check | Security | 1.5 | 1μs invalid key rejection |
+| H40 | Request fingerprinting (HyperLogLog) | Security | 3+ | 12KB abuse detection |
+| H41 | Timing-safe comparisons | Security | 1.5 | Prevents timing attacks |
+| H42 | Cryptographic erasure for GDPR | Security | 3+ | No backup purge needed |
+| H43 | Security headers hardening | Security | 1.5 | Defense in depth |
+| H44 | Precomputed API responses | API | 3+ | Zero-compute leaderboard |
+| H45 | PostgreSQL pipeline mode for batch | PostgreSQL | 3+ | 94% batch latency reduction |
+| H46 | Kernel tuning for SSE pods | SSE | Scale-triggered | 50K+ connections per pod |
+| H47 | Entity hot-tier in Redis | API | 3+ | 80% of traffic from Redis GET |
+| H48 | Compile-time route validation | API | 3+ | Catches errors before production |
 
 ---
 
@@ -1033,6 +1061,7 @@ Each Phase 1.5 component has a sequenced, non-destructive migration path with ex
 
 **Signal Table Partitioning:**
 1. Create `signals_partitioned` alongside existing `signals`
+1b. Create new indexes on `signals_partitioned` (including the updated `idx_signals_entity_polarity` with `published_at DESC`). Both old and new indexes exist during the dual-write period — monitor write IOPS for temporary overhead.
 2. Dual-write trigger: new INSERTs go to both tables
 3. Backfill historical data in batches (1000/s, off-peak)
 4. Verify row counts match
@@ -1086,6 +1115,8 @@ k6 scenarios verifying scale targets before production:
 - 50K signal ingestion storm (backfill)
 
 Success criteria: p99 < 500ms, zero 5xx, replication lag < 2s, consumer lag < 10K.
+
+The k6 scenario tests 10K API req/s as the initial validation threshold. The 50K target is the autoscaled ceiling — verified by scaling test pods and repeating the scenario at higher injection rates during pre-launch load testing.
 
 ### Deployment Strategy
 
