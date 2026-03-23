@@ -2,6 +2,14 @@
 
 > **Purpose:** Introduce the infrastructure layer that enables Gambit Engine to serve tens of thousands of concurrent dashboard users and API integrators with sub-second latency, zero-downtime deployments, and defense-in-depth tenant isolation. This phase lands between the completed Phase 1 (Engine Foundation) and Phase 2 (Ingestion Framework) retrofitting, and must be in place before Phase 3a (Gap Analysis) begins.
 
+### Revision History
+
+| Rev | Date | Changes |
+|-----|------|---------|
+| 1 | 2026-03-23 | Initial spec: Sections 1-9, H1-H48 |
+| 2 | 2026-03-23 | Review fixes: Phase 3a integration contract, CircuitBreaker API, index migration, connection budget, pool mapping, R1/R0 fallback, UNLOGGED scope, CDN Vary, shutdown order, optimization phases |
+| 3 | 2026-03-23 | Added: API idempotency, GraphQL persisted queries, snapshot pagination, migration linting, request priority, WebSocket upgrade, NATS KV, H49-H55 |
+
 ---
 
 ## Table of Contents
@@ -264,7 +272,7 @@ Real-time consumers read from memory replica (sub-millisecond). Batch consumers 
 
 Each consumer wraps its handler in the existing circuit breaker from `engine/src/health/circuit-breaker.ts`. When circuit opens (e.g., ClickHouse down), consumer stops pulling. NATS buffers messages. When circuit closes, consumer resumes and drains backlog. No messages lost, no retry storms.
 
-> **Note:** The existing `CircuitBreaker` at `engine/src/health/circuit-breaker.ts` will be extended with a `recordSuccess()` method and a public `state` getter for use in the consumer framework. The `recordFailure()` signature will accept an optional `FailureClass` argument (defaulting to `'transient'` for NATS consumer retries).
+> **Note:** The existing `CircuitBreaker` will be extended with a `recordSuccess()` method. The existing `getState()` and `getBackoffMs()` methods are used as-is. The existing required `FailureClass` parameter on `recordFailure()` is used directly — consumer retries pass `'transient'`.
 
 ```typescript
 async function consumeWithCircuitBreaker(
@@ -273,8 +281,8 @@ async function consumeWithCircuitBreaker(
   handler: (msg: JsMsg) => Promise<void>
 ) {
   while (true) {
-    if (breaker.state === 'open') {
-      await sleep(breaker.nextRetryMs);
+    if (breaker.getState() === 'open') {
+      await sleep(breaker.getBackoffMs());
       continue;
     }
     const msgs = await sub.fetch({ batch: prefetch, expires: 5000 });
@@ -284,7 +292,7 @@ async function consumeWithCircuitBreaker(
         msg.ack();
         breaker.recordSuccess();
       } catch (err) {
-        breaker.recordFailure();
+        breaker.recordFailure('transient');
         if (msg.info.redeliveryCount >= MAX_DELIVER) {
           await publishToDlq(msg, err);
           msg.term();
@@ -719,7 +727,7 @@ Admission controller with concurrency budgets on fallback paths. When ClickHouse
 
 ```typescript
 class DegradationRegistry {
-  // Check manual override (Redis) → then circuit breaker state
+  // Check manual override (NATS KV gambit-degradation bucket) → then circuit breaker state
   async getStatus(service: ServiceName): Promise<'healthy' | 'degraded' | 'down'>;
   getDegradedServices(): ServiceName[];
 }
@@ -729,7 +737,7 @@ API responses include `X-Gambit-Degraded` header and `meta.degraded` array. Dash
 
 ### Manual Degradation Override
 
-Admin endpoint sets Redis flag to force a service into degraded/down state. Propagated to all pods via NATS. Used for planned maintenance windows.
+Admin endpoint sets NATS KV entry in `gambit-degradation` bucket to force a service into degraded/down state. Propagated to all pods via NATS. Used for planned maintenance windows.
 
 ### Chaos Testing
 
@@ -1074,7 +1082,7 @@ Phase 5      Advanced Capabilities (+ GraphQL security, batch API, export)
 | H17 | 3-tier connection pools | PostgreSQL | 1.5 | Slow queries can't starve fast reads |
 | H18 | Columnar storage for cold partitions | PostgreSQL | 3+ | 8:1 compression |
 | H19 | Partial indexes for 90% query pattern | PostgreSQL | 1.5 | 40-60% smaller indexes |
-| H20 | pg_hint_plan for critical paths | PostgreSQL | 3+ | Force optimal plans |
+| H20 | pg_hint_plan for critical paths | PostgreSQL | 3+ | Ad-hoc query hints for 3-5 hottest queries where planner errs |
 | H21 | ETag content-hash for 304 responses | API | 1.5 | 30-50% zero-transfer |
 | H22 | Streaming JSON for large responses | API | 1.5 | Constant memory |
 | H23 | Request coalescing for thundering herd | API | 1.5 | 10K users = 1 DB query |
@@ -1103,13 +1111,13 @@ Phase 5      Advanced Capabilities (+ GraphQL security, batch API, export)
 | H46 | Kernel tuning for SSE pods | SSE | Scale-triggered | 50K+ connections per pod |
 | H47 | Entity hot-tier in Redis | API | 3+ | 80% of traffic from Redis GET |
 | H48 | Compile-time route validation | API | 3+ | Catches errors before production |
-| H49 | Redis pipelining for batch cache invalidation | API | 100x latency reduction on batch invalidation | 1.5 |
-| H50 | ClickHouse async inserts | Event Bus | 5-10x consumer throughput increase | 1.5 |
-| H51 | PostgreSQL JIT for gap scoring | PostgreSQL | 2-5x speedup on aggregation queries | 3+ |
-| H52 | TCP_NODELAY on SSE connections | SSE | Consistent <5ms event delivery (vs 50-200ms with Nagle) | 1.5 |
-| H53 | Custom Brotli dictionary for API responses | API | 15-20% additional compression over generic Brotli | 3+ |
-| H54 | Zero-allocation SSE fan-out arrays | SSE | GC pauses drop from ~50ms to <5ms | 1.5 |
-| H55 | Query plan pinning via pg_hint_plan | PostgreSQL | Prevents plan regression after statistics change | 3+ |
+| H49 | Redis pipelining for batch cache invalidation | API | 1.5 | 100x latency reduction on batch invalidation |
+| H50 | ClickHouse async inserts | Event Bus | 1.5 | 5-10x consumer throughput increase |
+| H51 | PostgreSQL JIT for gap scoring | PostgreSQL | 3+ | 2-5x speedup on aggregation queries |
+| H52 | TCP_NODELAY on SSE connections | SSE | 1.5 | Consistent <5ms event delivery (vs 50-200ms with Nagle) |
+| H53 | Custom Brotli dictionary for API responses | API | 3+ | 15-20% additional compression over generic Brotli |
+| H54 | Zero-allocation SSE fan-out arrays | SSE | 1.5 | Reduces GC pressure and allocation churn at 50K connections |
+| H55 | Query plan pinning via pg_hint_plan hint table | PostgreSQL | 3+ | Persistent plan pinning prevents regression after ANALYZE (extends H20 ad-hoc hints) |
 
 **55 hyper-optimizations** catalogued across all infrastructure layers.
 
@@ -1155,7 +1163,7 @@ Each Phase 1.5 component has a sequenced, non-destructive migration path with ex
 
 ### Feature Flags
 
-Every new infrastructure path controlled by Redis-backed feature flag. Rollback is a key change, not a deploy:
+Every new infrastructure path controlled by a feature flag in the NATS KV `gambit-flags` bucket (see Section 2). Exception: during Phase 1.5.1 deployment when NATS itself is being stood up, flags temporarily use Redis (`flag:*` keys) until NATS is available, then migrate to NATS KV. Rollback is a key change, not a deploy:
 
 ```
 flag:nats.publish.enabled
