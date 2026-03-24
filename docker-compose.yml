@@ -236,19 +236,18 @@ services:
       timeout: 3s
       retries: 5
 
-  pgbouncer:
-    image: edoburu/pgbouncer:latest
+  pgcat:
+    image: ghcr.io/postgresml/pgcat:latest
     ports:
       - "6432:6432"
-    environment:
-      DATABASE_URL: postgres://gambit:gambit@postgres:5432/gambit
-      POOL_MODE: transaction
-      MAX_CLIENT_CONN: 200
-      DEFAULT_POOL_SIZE: 20
-      MIN_POOL_SIZE: 5
+    volumes:
+      - ./docker/pgcat/pgcat.toml:/etc/pgcat/pgcat.toml:ro
     depends_on:
       postgres:
         condition: service_healthy
+    profiles:
+      - engine
+      - all
 
   redis-persistent:
     image: redis:7-alpine

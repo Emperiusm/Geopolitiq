@@ -1,0 +1,20 @@
+[general]
+host = "0.0.0.0"
+port = 6432
+connect_timeout = 5000
+idle_timeout = 30000
+shutdown_timeout = 30000
+
+[pools.gambit]
+
+[pools.gambit.shards.0]
+servers = [["postgres", 5432, "primary"]]
+database = "gambit"
+
+[pools.gambit.users.0]
+username = "gambit"
+password = "gambit_dev"
+pool_size = 20
+min_pool_size = 5
+pool_mode = "transaction"
+statement_timeout = 10000

@@ -6,6 +6,7 @@ export const configSchema = z.object({
   }),
   postgres: z.object({
     url: z.string().default('postgresql://gambit:gambit@localhost:6432/gambit'),
+    readUrl: z.string().optional(),
   }),
   mongo: z.object({
     uri: z.string().default('mongodb://localhost:27017/gambit'),

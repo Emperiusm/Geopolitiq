@@ -3,33 +3,62 @@ import postgres from 'postgres';
 import type { GambitConfig, Logger } from '@gambit/common';
 import type { DrizzleClient } from '../db/transaction';
 
-let db: DrizzleClient;
-let sql: ReturnType<typeof postgres>;
+let writeDb: DrizzleClient;
+let readDb: DrizzleClient;
+let writeSql: ReturnType<typeof postgres>;
+let readSql: ReturnType<typeof postgres>;
 
 export async function connectPostgres(config: GambitConfig, logger: Logger): Promise<DrizzleClient> {
-  sql = postgres(config.postgres.url, {
+  const writeUrl = config.postgres.url;
+  const readUrl = config.postgres.readUrl ?? config.postgres.url;
+
+  writeSql = postgres(writeUrl, {
     max: 20,
     idle_timeout: 30,
     connect_timeout: 10,
   });
 
-  db = drizzle(sql);
+  readSql = postgres(readUrl, {
+    max: 20,
+    idle_timeout: 30,
+    connect_timeout: 10,
+  });
 
-  await sql`SELECT 1`;
-  logger.info('PostgreSQL connected');
+  writeDb = drizzle(writeSql);
+  readDb = drizzle(readSql);
 
-  const warmPromises = Array.from({ length: 5 }, () => sql`SELECT 1`);
-  await Promise.all(warmPromises);
-  logger.info({ poolSize: 5 }, 'PostgreSQL pool warmed');
+  // Verify both connections
+  await writeSql`SELECT 1`;
+  logger.info('PostgreSQL write pool connected');
 
-  return db;
+  await readSql`SELECT 1`;
+  logger.info('PostgreSQL read pool connected');
+
+  // Warm both pools
+  const warmWrite = Array.from({ length: 5 }, () => writeSql`SELECT 1`);
+  const warmRead = Array.from({ length: 5 }, () => readSql`SELECT 1`);
+  await Promise.all([...warmWrite, ...warmRead]);
+  logger.info({ poolSize: 5 }, 'PostgreSQL pools warmed (write + read)');
+
+  return writeDb;
 }
 
+export function getWriteDb(): DrizzleClient {
+  if (!writeDb) throw new Error('PostgreSQL write pool not connected');
+  return writeDb;
+}
+
+export function getReadDb(): DrizzleClient {
+  if (!readDb) throw new Error('PostgreSQL read pool not connected');
+  return readDb;
+}
+
+/** Backward-compatible alias for getWriteDb */
 export function getDb(): DrizzleClient {
-  if (!db) throw new Error('PostgreSQL not connected');
-  return db;
+  return getWriteDb();
 }
 
 export async function closePgPool(): Promise<void> {
-  if (sql) await sql.end();
+  if (writeSql) await writeSql.end();
+  if (readSql) await readSql.end();
 }

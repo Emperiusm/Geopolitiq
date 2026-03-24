@@ -5,7 +5,7 @@ export type GambitConfig = ReturnType<typeof loadConfig>;
 export function loadConfig() {
   return configSchema.parse({
     engine: { port: process.env.ENGINE_PORT },
-    postgres: { url: process.env.POSTGRES_URL },
+    postgres: { url: process.env.POSTGRES_URL, readUrl: process.env.POSTGRES_READ_URL },
     mongo: { uri: process.env.MONGO_URI },
     redis: {
       cacheUrl: process.env.REDIS_CACHE_URL,
