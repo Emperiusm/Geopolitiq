@@ -37,9 +37,7 @@ export async function getNatsDeps(): Promise<{
       await bus.ensureStreams();
       _eventBus = bus;
 
-      const flags = new FF(nats, logger);
-      await flags.init();
-      _featureFlags = flags;
+      _featureFlags = await FF.create(nats, logger);
     }
   } catch {
     // NATS unavailable — callers will use the legacy fallback path

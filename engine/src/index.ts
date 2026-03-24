@@ -21,7 +21,9 @@ import { SearchService } from './services/search.service';
 import { healthRoutes } from './routes/health';
 import { entityRoutes } from './routes/entities';
 import { adminRoutes } from './routes/admin';
+import { batchRoutes } from './routes/batch';
 import { errorHandler } from './middleware/error-handler';
+import { priorityAdmission } from './middleware/priority-admission';
 import { authenticate } from './middleware/authenticate';
 import { dbContext } from './middleware/db-context';
 import { rateLimit } from './middleware/rate-limit';
@@ -133,6 +135,7 @@ async function boot() {
   app.use('*', etag());
   app.use('*', compress());
   app.use('*', errorHandler(logger));
+  app.use('*', priorityAdmission());
   app.use('*', degradationHeader(degradation));
 
   // Metrics middleware — records every request
@@ -162,6 +165,7 @@ async function boot() {
 
   app.route(`${basePath}/entities`, entityRoutes(container));
   app.route(`${basePath}/admin`, adminRoutes(container));
+  app.route(`${basePath}/batch`, batchRoutes(container));
 
   // Phase 2+ stubs — return 501 Not Implemented
   const phase2Stubs = ['/signals', '/scores', '/alerts', '/workflows', '/foia'];
