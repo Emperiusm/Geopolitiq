@@ -30,6 +30,8 @@ import { requestLogger } from './middleware/request-logger';
 import { apiVersion } from './middleware/api-version';
 import { etag } from './middleware/etag';
 import { registry, httpRequestDuration, httpRequestsTotal } from './infrastructure/metrics';
+import { DegradationRegistry } from './infrastructure/degradation';
+import { degradationHeader } from './middleware/degradation-header';
 
 // ── Bootstrap ────────────────────────────────────────────────────────
 
@@ -110,6 +112,9 @@ async function boot() {
   container.entityService = entityService;
   container.searchService = searchService;
 
+  // 11. Create DegradationRegistry (all optional services connected above)
+  const degradation = new DegradationRegistry();
+
   // Change Stream sync — wired in Task 9
   // const sync = new ChangeStreamSync(...);
   // await sync.start();
@@ -128,6 +133,7 @@ async function boot() {
   app.use('*', etag());
   app.use('*', compress());
   app.use('*', errorHandler(logger));
+  app.use('*', degradationHeader(degradation));
 
   // Metrics middleware — records every request
   app.use('*', async (c, next) => {
@@ -141,7 +147,7 @@ async function boot() {
   });
 
   // Public routes (no auth required)
-  app.route(basePath, healthRoutes(container));
+  app.route(basePath, healthRoutes(container, degradation));
 
   // Prometheus metrics endpoint — public, before authenticate middleware
   app.get('/metrics', async (c) => {
