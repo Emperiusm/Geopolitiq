@@ -4,6 +4,7 @@ import { recordId } from '@gambit/common';
 import { signals, entities } from '../../db';
 import type { ResolvedSignal, SourceConfig } from '../types';
 import type { DrizzleClient } from '../../db/transaction';
+import type { NatsFeatureFlags } from '../../infrastructure/nats-kv';
 
 const logger = createLogger('signal-writer');
 
@@ -37,6 +38,7 @@ export class SignalWriter {
   constructor(
     private db: DrizzleClient,
     private clickhouse: any | null,
+    private featureFlags?: NatsFeatureFlags | null,
   ) {}
 
   async writeSignal(signal: ResolvedSignal, source: SourceConfig): Promise<WriteResult> {
@@ -93,27 +95,33 @@ export class SignalWriter {
         .where(eq(entities.id, signal.entityId));
     }
 
-    // Queue ClickHouse row
-    const chRow: ClickHouseRow = {
-      id: writtenId,
-      entity_id: signal.entityId,
-      source_id: source.id,
-      category: signal.category,
-      polarity,
-      intensity: signal.intensity,
-      confidence: signal.confidence,
-      published_at: signal.publishedAt,
-      created_at: new Date().toISOString(),
-      domains: signal.domains,
-      tags: signal.tags ?? [],
-    };
+    // When nats.consumers.clickhouse is enabled the NATS consumer handles the
+    // ClickHouse write — skip the inline buffer to avoid double-writes.
+    const natsClickhouse = this.featureFlags?.isEnabled('nats.consumers.clickhouse', true) ?? false;
 
-    this.clickhouseBuffer.push(chRow);
+    if (!natsClickhouse) {
+      // Queue ClickHouse row (legacy inline path)
+      const chRow: ClickHouseRow = {
+        id: writtenId,
+        entity_id: signal.entityId,
+        source_id: source.id,
+        category: signal.category,
+        polarity,
+        intensity: signal.intensity,
+        confidence: signal.confidence,
+        published_at: signal.publishedAt,
+        created_at: new Date().toISOString(),
+        domains: signal.domains,
+        tags: signal.tags ?? [],
+      };
 
-    if (this.clickhouseBuffer.length >= CLICKHOUSE_FLUSH_SIZE) {
-      await this.flushClickHouse();
-    } else {
-      this.scheduleFlush();
+      this.clickhouseBuffer.push(chRow);
+
+      if (this.clickhouseBuffer.length >= CLICKHOUSE_FLUSH_SIZE) {
+        await this.flushClickHouse();
+      } else {
+        this.scheduleFlush();
+      }
     }
 
     return { written: true, deduplicated: false, signalId: writtenId };
