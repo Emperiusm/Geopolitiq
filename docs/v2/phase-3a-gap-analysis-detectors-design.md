@@ -2,11 +2,13 @@
 
 > **Scope:** Computation layer only. Scoring engine, 5 core detectors, workflow orchestration, graph snapshots. Phase 3b (separate spec) covers alerts/watchlists notification layer, webhook delivery, email, alert management API.
 
-> **Boundary:** Phase 3a computes scores, runs detectors, and inserts alerts into PostgreSQL. It publishes SSE events for score updates. It does NOT handle watchlist matching, webhook delivery, email notifications, or alert management API.
+> **Boundary:** Phase 3a computes scores, runs detectors, and inserts alerts into PostgreSQL. It publishes events to NATS JetStream for score updates. The Phase 1.5 SSE Gateway delivers these to connected dashboard clients. It does NOT handle watchlist matching, webhook delivery, email notifications, or alert management API.
 
 > **Parent spec:** `docs/v2/2026-03-22-gambit-engine-signal-design.md` (Sections 6, 10, 15, 16)
 
 > **Depends on:** Phase 1 (Engine Foundation) + Phase 2 (Ingestion Framework) — both merged to main.
+
+> **Infrastructure:** Phase 1.5 (Scale Infrastructure) — NATS JetStream event bus, PgCat connection pooling, SSE Gateway, DegradationRegistry, 3-tier cache strategy. Gap scoring publishes events to NATS instead of Redis Pub/Sub. SSE delivery via dedicated SSE Gateway.
 
 ---
 
@@ -584,6 +586,8 @@ WHERE e.id = sub.entity_id
 
 Scoring workflow checks ClickHouse health at startup. Falls back to PG if unavailable. Logs warning so ops knows scoring is in degraded mode.
 
+> **Phase 1.5 Update:** The `SignalReader` ClickHouse/PostgreSQL fallback is integrated with Phase 1.5's `DegradationRegistry`. Instead of independent health checking, the reader checks `degradation.isHealthy('clickhouse')` to decide which backend to use. This provides unified health state across all services.
+
 ### 2.11 Batch Signal Reads
 
 When computing scores for N entity-domain pairs in one chunk, single query:
@@ -847,6 +851,8 @@ Each detector has a `version` field stored in alert `meta.detectorVersion`. When
 ## 4. Workflow Orchestration
 
 ### 4.1 Signal-Driven Path
+
+> **Phase 1.5 Update:** The Redis sorted set coordinator (`gap:pending`) is replaced by NATS JetStream. Signal ingestion publishes `signals.ingested.{entityId}` events to the SIGNALS stream. The Gap Coordinator subscribes to these events via NATS consumer instead of polling Redis. The 6-hour scheduled sweep remains as a safety net. Advisory locks use `pg_try_advisory_xact_lock()` (transaction-scoped, PgCat-safe).
 
 ```
 Signal batch workflow writes signals to PG + ClickHouse
@@ -1184,6 +1190,8 @@ SSE_CHANNELS = {
 };
 ```
 
+> **Phase 1.5 Update:** SSE events are published to NATS streams (not Redis Pub/Sub). The Phase 1.5 SSE Gateway subscribes to NATS and delivers events to connected clients. `gap-score-updated` publishes to NATS subject `gaps.recomputed.{entityId}`. `alert-created` publishes to `alerts.fired.{severity}`. The SSE Gateway filters by team watchlist subscriptions.
+
 `gap-score-updated` → publishes to `SSE_CHANNELS.entity(entityId)` (existing)
 `alert-created` → publishes to `SSE_CHANNELS.alerts(teamId)` (new) + `SSE_CHANNELS.entity(entityId)` (existing)
 `alert-status-changed` → publishes to `SSE_CHANNELS.alerts(teamId)` (new)
@@ -1287,6 +1295,8 @@ Event-driven on `GapBatchRecomputeWorkflow` completion:
 3. Publish SSE `gap-score-updated` events
 4. Dashboard receives SSE → refetches if viewing affected entity
 
+> **Phase 1.5 Update:** Cache invalidation is handled by the Phase 1.5 CacheInvalidatorConsumer (3 NATS consumer instances covering signals, entities, and gaps streams). Gap score recomputes publish to NATS → cache invalidator deletes Redis keys + broadcasts L1 invalidation. The 3-tier cache (L1 LRU → L2 Redis → L3 DB) with per-endpoint strategies replaces ad-hoc caching.
+
 ---
 
 ## 11. Observability
@@ -1294,6 +1304,9 @@ Event-driven on `GapBatchRecomputeWorkflow` completion:
 ### 11.1 OpenTelemetry Trace Propagation
 
 Full trace from signal write → gap score → detector → alert:
+
+> **Phase 1.5 Update:** Trace context propagates via NATS message headers (`Gambit-Trace-Id`), not Redis sorted set metadata. OpenTelemetry `traceparent` header enables end-to-end tracing from signal ingestion through gap scoring to SSE delivery.
+
 - Signal writer attaches trace context to Redis sorted set entry metadata
 - Coordinator propagates trace to GapBatchRecomputeWorkflow
 - Chunk workflows propagate to DetectorBatchWorkflow
@@ -1313,6 +1326,8 @@ Engine health endpoint additions:
 - Detector circuit breaker states
 - ClickHouse availability (primary signal reader)
 - Redis sorted set depth (pending recomputes)
+
+> **Phase 1.5 Update:** Replace "Redis sorted set depth" with NATS consumer lag metric (`nats_consumer_lag{stream="GAP_SCORES"}`). Prometheus scrapes NATS monitoring endpoint.
 
 ---
 
