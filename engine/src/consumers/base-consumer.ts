@@ -91,6 +91,8 @@ export abstract class BaseConsumer {
           ack_policy: AckPolicy.Explicit,
           deliver_policy: DeliverPolicy.New,
           filter_subject: filterSubject,
+          max_deliver: this.config.maxRetries,
+          ack_wait: 30_000_000_000,
         });
         this.logger.info({ stream, consumerName, filterSubject }, 'Durable consumer created');
       } else {

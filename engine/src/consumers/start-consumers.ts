@@ -61,12 +61,30 @@ async function main(): Promise<void> {
     typesense,
   );
 
-  const cacheConsumer = new CacheInvalidatorConsumer(
-    CacheInvalidatorConsumer.defaultConfig(baseConfig),
+  // Three cache invalidators — one per stream (signals, entities, gap scores)
+  const cacheSignalsConsumer = new CacheInvalidatorConsumer(
+    CacheInvalidatorConsumer.signalsConfig(baseConfig),
     redisCache,
   );
 
-  const consumers = [clickhouseConsumer, neo4jConsumer, typesenseConsumer, cacheConsumer];
+  const cacheEntitiesConsumer = new CacheInvalidatorConsumer(
+    CacheInvalidatorConsumer.entitiesConfig(baseConfig),
+    redisCache,
+  );
+
+  const cacheGapsConsumer = new CacheInvalidatorConsumer(
+    CacheInvalidatorConsumer.gapsConfig(baseConfig),
+    redisCache,
+  );
+
+  const consumers = [
+    clickhouseConsumer,
+    neo4jConsumer,
+    typesenseConsumer,
+    cacheSignalsConsumer,
+    cacheEntitiesConsumer,
+    cacheGapsConsumer,
+  ];
 
   // ── Graceful shutdown ─────────────────────────────────────────────
   const shutdown = async (signal: string) => {

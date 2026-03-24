@@ -74,6 +74,12 @@ export async function setupSignalsPartitioning(db: DrizzleClient, logger: Logger
     logger.info('pg_partman partitioning applied to signals table');
   }
 
+  // Composite B-tree index for entity-scoped signal queries (primary lookup path)
+  await db.execute(sql`
+    CREATE INDEX IF NOT EXISTS idx_signals_entity_polarity
+    ON signals (entity_id, polarity, published_at DESC)
+  `);
+
   // BRIN index on published_at — tiny, fast time-range scans across partitions
   await db.execute(sql`
     CREATE INDEX IF NOT EXISTS signals_published_at_brin
@@ -87,5 +93,5 @@ export async function setupSignalsPartitioning(db: DrizzleClient, logger: Logger
     WHERE expires_at IS NULL OR expires_at > NOW()
   `);
 
-  logger.info('BRIN and partial indexes ensured on signals table');
+  logger.info('Composite B-tree, BRIN, and partial indexes ensured on signals table');
 }
