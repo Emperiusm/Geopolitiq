@@ -221,7 +221,7 @@ services:
   # ═══════════════════════════════════════════════════
 
   postgres:
-    image: postgres:17
+    build: ./docker/postgres
     ports:
       - "5432:5432"
     environment:
