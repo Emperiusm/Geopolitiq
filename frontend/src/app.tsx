@@ -5,6 +5,10 @@ import {
   bootstrapLoading,
   latestEvents,
   viewMode,
+  selectedTradeRoute,
+  selectedPort,
+  selectTradeRoute,
+  selectPort,
 } from './state/store';
 import { fetchBootstrap } from './api/bootstrap';
 import { connectSSE, disconnectSSE } from './api/sse';
@@ -16,6 +20,7 @@ import { RightPanel } from './panels/right-panel';
 import { TimelineScrubber } from './panels/timeline-scrubber';
 import { ComparePanel } from './panels/compare-panel';
 import { GraphExplorer } from './panels/graph-explorer';
+import { TradeRoutesPanel } from './panels/trade-routes-panel';
 import { FilterBar } from './panels/filter-bar';
 import { Header } from './panels/header';
 import { SettingsPanel } from './panels/settings-panel';
@@ -23,10 +28,22 @@ import { useKeyboardShortcuts } from './components/keyboard-shortcuts';
 import { ErrorBoundary } from './components/error-boundary';
 import { Skeleton } from './components/skeleton';
 import { BasemapPicker } from './components/basemap-picker';
+import { resolveTradeArcs } from './layers/trade-routes-resolver';
+import type { ResolvedArc, WaypointData } from './layers/trade-routes-resolver';
 
 export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mapMode, setMapMode] = useState<'globe' | 'flat'>('globe');
+  const [allArcs, setAllArcs] = useState<ResolvedArc[]>([]);
+  const [allWaypointsByRoute, setAllWaypointsByRoute] = useState<Map<string, WaypointData[]>>(new Map());
+
+  useEffect(() => {
+    const data = bootstrapData.value;
+    if (!data) return;
+    const { arcs, waypointsByRoute } = resolveTradeArcs(data.tradeRoutes, data.ports, data.chokepoints);
+    setAllArcs(arcs);
+    setAllWaypointsByRoute(waypointsByRoute);
+  }, [bootstrapData.value]);
 
   // Keyboard shortcuts integration
   useKeyboardShortcuts();
@@ -137,6 +154,23 @@ export function App() {
       <ErrorBoundary fallback={<span />}>
         <ComparePanel />
       </ErrorBoundary>
+
+      {(selectedTradeRoute.value !== null || selectedPort.value !== null) && (
+        <ErrorBoundary fallback={<span />}>
+          <TradeRoutesPanel
+            route={selectedTradeRoute.value}
+            port={selectedPort.value}
+            allArcs={allArcs}
+            waypoints={
+              selectedTradeRoute.value
+                ? (allWaypointsByRoute.get(selectedTradeRoute.value._id) ?? [])
+                : []
+            }
+            onClose={() => { selectTradeRoute(null); selectPort(null); }}
+            onSelectRoute={selectTradeRoute}
+          />
+        </ErrorBoundary>
+      )}
 
       {settingsOpen && (
         <ErrorBoundary fallback={<span />}>

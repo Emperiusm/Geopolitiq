@@ -1,0 +1,31 @@
+id: source:usaspending
+name: USASpending.gov — Contract Awards
+category: government-contract
+polarity: behavioral
+tier: 2
+
+fetcher:
+  type: http
+  url: "https://api.usaspending.gov/api/v2/search/spending_by_award/"
+  schedule: "0 2 * * *"   # daily at 02:00 UTC
+  pagination: page
+  rateLimitMs: 200   # USASpending allows 5 req/s
+  auth:
+    type: none
+
+parser:
+  mode: structured
+  ref: usaspending
+
+domains:
+  - government-spending
+  - defense
+  - procurement
+
+meta:
+  format: json
+  dataSource: USASpending.gov API v2
+  notes: >
+    Contract awards from USASpending.gov. Parser extracts recipient,
+    awarding agency, NAICS codes, period of performance, and total obligation.
+    Maps to government-contract category with financial weight.

@@ -1,0 +1,12 @@
+<clickhouse>
+  <users>
+    <gambit>
+      <password>gambit-dev</password>
+      <networks><ip>::/0</ip></networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <max_memory_usage>2000000000</max_memory_usage>
+      <max_execution_time>30</max_execution_time>
+    </gambit>
+  </users>
+</clickhouse>

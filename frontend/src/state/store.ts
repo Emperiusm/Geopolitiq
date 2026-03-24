@@ -136,6 +136,16 @@ export const graphConnections = signal<{
 } | null>(null);
 
 export const heatmapOpacity = signal(0.8);
+
+// ── Trade Routes selection ────────────────────────────────────
+import type { ResolvedPort } from '../layers/trade-routes-resolver';
+
+export const selectedTradeRoute = signal<any | null>(null);
+export const selectedPort = signal<ResolvedPort | null>(null);
+export const tradeRouteFilter = signal<Set<'energy' | 'container' | 'bulk'>>(
+  new Set(['energy', 'container', 'bulk'])
+);
+
 export const pluginManifests = signal<any[]>([]);
 export const userSettings = signal<UserSettings>({ aiEnabled: false });
 
@@ -202,7 +212,12 @@ export function cycleBasemap() {
 }
 
 export function toggleLayer(key: keyof LayerState) {
-  layers.value = { ...layers.value, [key]: !layers.value[key] };
+  const next = !layers.value[key];
+  layers.value = { ...layers.value, [key]: next };
+  if (key === 'tradeRoutes' && !next) {
+    selectedTradeRoute.value = null;
+    selectedPort.value = null;
+  }
 }
 
 export function applyPreset(preset: LayerPreset) {
@@ -228,6 +243,16 @@ export function addToCompare(country: Country) {
 
 export function removeFromCompare(id: string) {
   compareCountries.value = compareCountries.value.filter(c => c._id !== id);
+}
+
+export function selectTradeRoute(route: any | null) {
+  selectedTradeRoute.value = route;
+  selectedPort.value = null;
+}
+
+export function selectPort(port: ResolvedPort | null) {
+  selectedPort.value = port;
+  selectedTradeRoute.value = null;
 }
 
 export function dismissAnomaly(idx: number) {

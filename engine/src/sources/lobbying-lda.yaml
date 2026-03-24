@@ -1,0 +1,28 @@
+id: source:lobbying-lda
+name: Senate Lobbying Disclosure (LDA) Filings
+category: lobbying-disclosure
+polarity: behavioral
+tier: 3
+
+fetcher:
+  type: http
+  url: "https://lda.senate.gov/api/v1/filings/?filing_type=Q{quarter}&year={year}"
+  schedule: "0 4 * * 1"   # weekly, Monday 04:00 UTC
+  pagination: cursor
+  rateLimitMs: 1000
+
+parser:
+  mode: structured
+  ref: lobbying-lda
+
+domains:
+  - government-affairs
+  - lobbying
+  - policy
+
+meta:
+  format: xml
+  dataSource: Senate Lobbying Disclosure Act (LDA) API
+  notes: >
+    Senate LDA XML filings. Parser extracts registrant, client, lobbying issues,
+    federal bills lobbied on (concept claims), and income/expense amounts.

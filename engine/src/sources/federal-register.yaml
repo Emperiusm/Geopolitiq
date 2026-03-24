@@ -1,0 +1,44 @@
+id: source:federal-register
+name: Federal Register — Rules and Notices
+category: regulatory-filing
+polarity: behavioral
+tier: 2
+
+fetcher:
+  type: http
+  url: "https://www.federalregister.gov/api/v1/documents.json?per_page=100&order=newest&conditions[publication_date][gte]={since}"
+  schedule: "0 14 * * *"   # daily at 14:00 UTC (after morning edition publishes)
+  pagination: page
+  rateLimitMs: 500
+
+parser:
+  # Hybrid mode: agent parser for regulatory content extraction
+  # Federal Register documents vary significantly in structure and content
+  mode: hybrid
+  model: claude-haiku-4-5
+  maxInputTokens: 8000
+  prompt: |
+    You are analyzing Federal Register documents to extract geopolitical intelligence signals.
+    Focus on:
+    - Proposed rules and final rules affecting technology, defense, or trade
+    - Export control changes (EAR, ITAR, BIS)
+    - Sanctions additions or modifications
+    - Agency notices with strategic significance
+    Extract entityNames (companies, countries, technologies mentioned),
+    identify the regulatory action type, and assess intensity based on scope.
+    Output as a JSON array of ParsedSignal objects.
+
+domains:
+  - regulatory
+  - policy
+  - export-controls
+  - sanctions
+
+meta:
+  format: json
+  dataSource: Federal Register API (federalregister.gov)
+  notes: >
+    Federal Register documents use the agent (hybrid) parser. Content varies from
+    dense legal text to tables of entity listings (sanctions). Agent parser handles
+    format variation. High-value signals: export control rule changes, sanctions
+    additions, CFIUS notices.

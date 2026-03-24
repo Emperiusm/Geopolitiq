@@ -1,0 +1,40 @@
+id: source:sec-edgar
+name: SEC EDGAR Filings (Form 4 + 13F)
+category: sec-filing
+polarity: behavioral
+tier: 2
+
+fetcher:
+  type: http
+  url: "https://efts.sec.gov/LATEST/search-index?q=%22form+4%22&dateRange=custom&startdt={since}&enddt={until}&hits.hits.total.value=true"
+  schedule: "0 */4 * * *"   # every 4 hours on weekdays
+  pagination: offset
+  rateLimitMs: 500   # SEC rate limit: 10 req/s → 500ms safe margin
+
+parser:
+  mode: structured
+  ref: sec-form4
+  routing:
+    # Route to appropriate parser based on form type
+    conditions:
+      - field: formType
+        value: "4"
+        parserRef: sec-form4
+      - field: formType
+        value: "13F-HR"
+        parserRef: sec-13f
+
+domains:
+  - equity-markets
+  - insider-trading
+  - institutional-investing
+
+dependencies: []
+
+meta:
+  format: xml
+  dataSource: SEC EDGAR Full-Text Search API
+  notes: >
+    SEC EDGAR filings. Routed to sec-form4 or sec-13f parser based on form type.
+    Form 4 extracts insider transactions; 13F extracts institutional holdings.
+    Rate limit: 10 requests/second per SEC EDGAR policy.

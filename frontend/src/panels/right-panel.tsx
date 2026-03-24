@@ -8,6 +8,7 @@ import {
   userSettings,
   bootstrapData,
   graphConnections,
+  selectTradeRoute,
   type Conflict,
 } from '../state/store';
 import { api } from '../api/client';
@@ -15,7 +16,6 @@ import { Sparkline } from '../components/sparkline';
 import { Badge } from '../components/badge';
 import { ConflictsPanel } from './conflicts-panel';
 import { ChokepointsPanel } from './chokepoints-panel';
-import { TradeRoutesPanel } from './trade-routes-panel';
 import { BasesPanel } from './bases-panel';
 import { NsaPanel } from './nsa-panel';
 import { ElectionsPanel } from './elections-panel';
@@ -134,7 +134,7 @@ function OverviewTab() {
       switch (entity.type) {
         case 'conflict': return <ConflictsPanel conflict={data as Conflict} />;
         case 'chokepoint': return <ChokepointsPanel chokepoint={data} />;
-        case 'trade-route': return <TradeRoutesPanel route={data} />;
+        case 'trade-route': { selectTradeRoute(data); return null; }
         case 'base': return <BasesPanel base={data} />;
         case 'nsa': return <NsaPanel nsa={data} />;
         case 'election': return <ElectionsPanel election={data} />;

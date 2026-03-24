@@ -1,0 +1,28 @@
+id: source:fcc-authorizations
+name: FCC Equipment Authorizations
+category: fcc-authorization
+polarity: behavioral
+tier: 3
+
+fetcher:
+  type: http
+  url: "https://apps.fcc.gov/oetcf/eas/reports/GetApplicationsList.cfm?fromDate={since}&toDate={until}&output=json"
+  schedule: "0 6 * * 5"   # weekly, Friday 06:00 UTC
+  pagination: offset
+  rateLimitMs: 1000
+
+parser:
+  mode: structured
+  ref: fcc-authorizations
+
+domains:
+  - telecommunications
+  - regulatory
+  - spectrum
+
+meta:
+  format: json
+  dataSource: FCC Equipment Authorization System (EAS)
+  notes: >
+    FCC equipment authorization records. Parser extracts equipment type,
+    applicant name, FRN, radio service code, and authorization date.

@@ -1,0 +1,53 @@
+[general]
+host = "0.0.0.0"
+port = 6432
+connect_timeout = 5000
+idle_timeout = 30000
+shutdown_timeout = 30000
+
+# Three pools map to the same Postgres database in dev.
+# In production, read pools would point to replicas.
+# Clients connect to PgCat using the pool name as the database name
+# (e.g., connect to "gambit_write", "gambit_fast_read", or "gambit_slow_read").
+
+[pools.gambit_write]
+
+[pools.gambit_write.shards.0]
+servers = [["postgres", 5432, "primary"]]
+database = "gambit"
+
+[pools.gambit_write.users.0]
+username = "gambit"
+password = "gambit"
+pool_size = 20
+min_pool_size = 5
+pool_mode = "transaction"
+statement_timeout = 10000
+
+[pools.gambit_fast_read]
+
+[pools.gambit_fast_read.shards.0]
+servers = [["postgres", 5432, "primary"]]
+database = "gambit"
+
+[pools.gambit_fast_read.users.0]
+username = "gambit"
+password = "gambit"
+pool_size = 30
+min_pool_size = 5
+pool_mode = "transaction"
+statement_timeout = 5000
+
+[pools.gambit_slow_read]
+
+[pools.gambit_slow_read.shards.0]
+servers = [["postgres", 5432, "primary"]]
+database = "gambit"
+
+[pools.gambit_slow_read.users.0]
+username = "gambit"
+password = "gambit"
+pool_size = 15
+min_pool_size = 3
+pool_mode = "transaction"
+statement_timeout = 30000

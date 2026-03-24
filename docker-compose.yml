@@ -173,20 +173,23 @@ services:
   # ═══════════════════════════════════════════════════
 
   neo4j:
-    image: neo4j:5-community
+    image: neo4j:5
     ports:
       - "7474:7474"
       - "7687:7687"
-    volumes:
-      - neo4j-data:/data
-      - neo4j-backups:/backups
     environment:
       NEO4J_AUTH: neo4j/gambit-dev
       NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_server_memory_heap_initial__size: 512m
-      NEO4J_server_memory_heap_max__size: 1g
-      NEO4J_server_memory_pagecache_size: 512m
-      NEO4J_db_transaction_timeout: 30s
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "gambit-dev", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - engine
+      - all
 
   ollama:
     image: ollama/ollama
@@ -210,9 +213,297 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
+    profiles:
+      - dev
+
+  # ═══════════════════════════════════════════════════
+  # ENGINE INFRASTRUCTURE — Postgres, PgBouncer, Redis-persistent
+  # ═══════════════════════════════════════════════════
+
+  postgres:
+    build: ./docker/postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: gambit
+      POSTGRES_PASSWORD: gambit
+      POSTGRES_DB: gambit
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gambit"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  pgcat:
+    image: ghcr.io/postgresml/pgcat:latest
+    ports:
+      - "6432:6432"
+    volumes:
+      - ./docker/pgcat/pgcat.toml:/etc/pgcat/pgcat.toml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - engine
+      - all
+
+  redis-persistent:
+    image: redis:7-alpine
+    ports:
+      - "6381:6379"
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy noeviction
+    volumes:
+      - redis_persistent_data:/data
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    profiles:
+      - dev
+      - engine
+      - all
+
+  # ═══════════════════════════════════════════════════
+  # ENGINE PROFILE — ClickHouse, Typesense, Temporal, MinIO
+  # ═══════════════════════════════════════════════════
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9100:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./docker/clickhouse/users.xml:/etc/clickhouse-server/users.d/gambit.xml
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  typesense:
+    image: typesense/typesense:27.1
+    ports:
+      - "8108:8108"
+    environment:
+      TYPESENSE_API_KEY: gambit-dev
+      TYPESENSE_DATA_DIR: /data
+    volumes:
+      - typesense_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8108/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  postgres-temporal:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - pg_temporal_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    ports:
+      - "7233:7233"
+    environment:
+      - DB=postgresql
+      - POSTGRES_SEEDS=postgres-temporal
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+    depends_on:
+      postgres-temporal:
+        condition: service_healthy
+    profiles:
+      - engine
+      - all
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+    profiles:
+      - engine
+      - all
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: gambit
+      MINIO_ROOT_PASSWORD: gambit-dev
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    profiles:
+      - engine
+      - all
+
+  minio-init:
+    image: minio/mc:latest
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set gambit http://minio:9000 gambit gambit-dev;
+      mc mb --ignore-existing gambit/documents;
+      mc mb --ignore-existing gambit/exports;
+      mc mb --ignore-existing gambit/foia-responses;
+      mc mb --ignore-existing gambit/raw-payloads;
+      mc mb --ignore-existing gambit/token-embeddings;
+      "
+    depends_on:
+      - minio
+    profiles:
+      - engine
+      - all
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["--jetstream", "--store_dir=/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    profiles:
+      - engine
+      - all
+
+  # ═══════════════════════════════════════════════════
+  # OBSERVABILITY PROFILE — OTel Collector, Tempo, Grafana
+  # ═══════════════════════════════════════════════════
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./docker/otel/config.yaml:/etc/otel/config.yaml
+    depends_on:
+      - tempo
+    profiles:
+      - observability
+      - all
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    profiles:
+      - observability
+      - all
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    profiles:
+      - observability
+      - all
+
+  tempo:
+    image: grafana/tempo:latest
+    ports:
+      - "3200:3200"
+    profiles:
+      - observability
+      - all
+
+  pyroscope:
+    image: grafana/pyroscope:latest
+    ports:
+      - "4040:4040"
+    profiles:
+      - observability
+      - all
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+    profiles:
+      - observability
+      - all
+
+  # ═══════════════════════════════════════════════════
+  # TEST PROFILE — isolated test databases
+  # ═══════════════════════════════════════════════════
+
+  postgres-test:
+    image: postgres:17
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: gambit_test
+      POSTGRES_PASSWORD: gambit_test
+      POSTGRES_DB: gambit_test
+    tmpfs: /var/lib/postgresql/data
+    profiles:
+      - test
 
 volumes:
   mongo-data:
   neo4j-data:
-  neo4j-backups:
   ollama-models:
+  pgdata:
+  pg_temporal_data:
+  clickhouse_data:
+  typesense_data:
+  minio_data:
+  redis_persistent_data:
+  caddy_data:
+  grafana_data:
+  nats_data:
+  loki_data:

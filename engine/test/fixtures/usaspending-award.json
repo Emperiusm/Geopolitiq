@@ -1,0 +1,62 @@
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": "CONT_AWD_FA872123C0001_9700_-NONE-_-NONE-",
+      "type": "A",
+      "type_description": "BPA Call",
+      "agency": "Department of Defense",
+      "awarding_agency": {
+        "id": 1234,
+        "toptier_agency": {
+          "name": "Department of Defense",
+          "abbreviation": "DOD"
+        },
+        "subtier_agency": {
+          "name": "Department of the Air Force",
+          "abbreviation": "USAF"
+        }
+      },
+      "funding_agency": {
+        "id": 1235,
+        "toptier_agency": {
+          "name": "Department of Defense",
+          "abbreviation": "DOD"
+        }
+      },
+      "recipient": {
+        "recipient_name": "Palantir Technologies Inc",
+        "recipient_uei": "ABCD1234EFGH",
+        "location": {
+          "city_name": "Denver",
+          "state_code": "CO",
+          "zip5": "80202",
+          "country_name": "UNITED STATES"
+        }
+      },
+      "description": "ARTIFICIAL INTELLIGENCE AND MACHINE LEARNING PLATFORM FOR INTELLIGENCE ANALYSIS AND DECISION SUPPORT",
+      "total_obligation": 480000000.00,
+      "base_and_all_options_value": 480000000.00,
+      "period_of_performance_start_date": "2023-06-01",
+      "period_of_performance_current_end_date": "2028-05-31",
+      "date_signed": "2023-05-15",
+      "naics_code": "541511",
+      "naics_description": "Custom Computer Programming Services",
+      "product_or_service_code": "D318",
+      "product_or_service_code_description": "IT AND TELECOM- BUSINESS APPLICATION/APPLICATION DEVELOPMENT SUPPORT",
+      "place_of_performance": {
+        "city_name": "Denver",
+        "state_code": "CO",
+        "country_name": "UNITED STATES"
+      },
+      "latest_transaction_contract_data": {
+        "contract_award_type": "A",
+        "extent_competed": "A",
+        "type_of_set_aside": "NONE",
+        "clinger_cohen_act_planning": "N"
+      }
+    }
+  ]
+}

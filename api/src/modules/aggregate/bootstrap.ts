@@ -17,7 +17,7 @@ const SLIM_PROJECTIONS = {
   conflicts: { _id: 1, title: 1, lat: 1, lng: 1, dayCount: 1, status: 1, casualties: 1 },
   elections: { _id: 1, country: 1, lat: 1, lng: 1, dateISO: 1, type: 1, flag: 1 },
   tradeRoutes: {},
-  ports: { _id: 1, name: 1, lat: 1, lng: 1 },
+  ports: { _id: 1, name: 1, lat: 1, lng: 1, country: 1 },
 };
 
 async function fetchBootstrapData(db: any, slim: boolean) {

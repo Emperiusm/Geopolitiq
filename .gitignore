@@ -19,3 +19,4 @@ verify-*.png
 
 # Backup files
 *.bak
+.worktrees/
