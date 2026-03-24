@@ -21,7 +21,9 @@
     "worker:resolve": "bun src/pipeline/workers/resolve-worker.ts",
     "worker:write": "bun src/pipeline/workers/write-worker.ts",
     "worker:system": "bun src/pipeline/workers/system-worker.ts",
-    "test:pipeline": "vitest run test/pipeline/e2e.test.ts"
+    "test:pipeline": "vitest run test/pipeline/e2e.test.ts",
+    "sse-gateway": "bun run src/sse-gateway/index.ts",
+    "consumers": "bun run src/consumers/start-consumers.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
