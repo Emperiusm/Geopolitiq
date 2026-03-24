@@ -4,12 +4,12 @@
 
 **Goal:** Build the gap scoring engine, 5 core detectors, and Temporal workflow orchestration on top of Phase 1/2's engine foundation and ingestion pipeline.
 
-**Architecture:** Gap scores are computed by Temporal workflows triggered via a Redis sorted set coordinator (signal-driven) and a 6-hour scheduled sweep. Detectors run in a separate batched workflow after scoring. Scores are dual-written to PostgreSQL (current state) and ClickHouse (history). A `SignalReader` interface provides ClickHouse-primary reads with PostgreSQL fallback.
+**Architecture:** Gap scores are computed by Temporal workflows triggered via NATS JetStream events (signal-driven, replacing the Redis sorted set coordinator) and a 6-hour scheduled sweep. Detectors run in a separate batched workflow after scoring. Scores are written to PostgreSQL (current state) and published to NATS for ClickHouse sync (via Phase 1.5 consumer) and SSE delivery (via Phase 1.5 SSE Gateway). A `SignalReader` interface provides ClickHouse-primary reads with PostgreSQL fallback via the DegradationRegistry.
 
-**Tech Stack:** Bun, Hono, Temporal (workflows + activities + workers), Drizzle ORM, PostgreSQL 17, ClickHouse, Neo4j, Redis (ioredis), pino, Zod, Vitest, Docker Compose.
+**Tech Stack:** Bun, Hono, Temporal (workflows + activities + workers), Drizzle ORM, PostgreSQL 17, ClickHouse, Neo4j, NATS JetStream, Redis (ioredis), pino, Zod, Vitest, Docker Compose.
 
 **Design spec:** `docs/v2/phase-3a-gap-analysis-detectors-design.md`
-**Depends on:** Phase 1 (Engine Foundation) + Phase 2 (Ingestion Framework) — both merged to main.
+**Depends on:** Phase 1 (Engine Foundation) + Phase 2 (Ingestion Framework) + Phase 1.5 (Scale Infrastructure — NATS JetStream, PgCat, SSE Gateway, DegradationRegistry, cache strategy) — all merged to main.
 
 ---
 
@@ -75,7 +75,7 @@
 | `engine/src/pipeline/workflows/gap-chunk.ts` | GapChunkWorkflow — compute scores for a chunk of pairs |
 | `engine/src/pipeline/workflows/gap-batch-recompute.ts` | GapBatchRecomputeWorkflow — fan-out chunks + rollup |
 | `engine/src/pipeline/workflows/detector-batch.ts` | DetectorBatchWorkflow — run detectors on scored pairs |
-| `engine/src/pipeline/workflows/gap-coordinator.ts` | Gap Coordinator — singleton polling Redis sorted set |
+| `engine/src/pipeline/workflows/gap-coordinator.ts` | Gap Coordinator — NATS consumer for gap recompute events + 6-hour scheduled sweep |
 | `engine/src/pipeline/workflows/gap-scheduled-sweep.ts` | GapScheduledSweepWorkflow — 6-hour delta recompute |
 | `engine/src/pipeline/activities/gap.ts` | Gap scoring activities (compute, rollup, signal-read) |
 | `engine/src/pipeline/activities/detector.ts` | Detector activities (heavyweight detection) |
@@ -116,7 +116,7 @@
 | `engine/src/services/container.ts` | Add gapService, detectorService, graphSnapshotService |
 | `engine/src/index.ts` | Wire new services, routes, coordinator bootstrap |
 | `engine/src/events/event-types.ts` | Add gap-score-updated, alert-created, alert-status-changed |
-| `engine/src/pipeline/activities/write.ts` | Add ZADD gap:pending + update entities.lastSignalAt |
+| `engine/src/pipeline/activities/write.ts` | Publish gap-recompute event to NATS + update entities.lastSignalAt |
 | `engine/src/routes/entities.ts` | Replace Phase 3 stubs with real implementations |
 | `engine/src/routes/admin.ts` | Add /recompute endpoint |
 
@@ -946,6 +946,8 @@ git commit -m "feat(phase-3a): domain taxonomy seed data, DomainService, and YAM
 **Files:**
 - Create: `engine/src/gap/signal-reader.ts`
 - Create: `engine/test/gap/signal-reader.test.ts`
+
+> **Phase 1.5 Integration:** The SignalReader's ClickHouse/PostgreSQL switching integrates with `DegradationRegistry.isHealthy('clickhouse')` from Phase 1.5 instead of independent health checking. Import from `engine/src/infrastructure/degradation.ts`.
 
 - [ ] **Step 1: Write failing test**
 
@@ -2822,6 +2824,8 @@ git commit -m "feat(phase-3a): detector batch workflow with lightweight + heavyw
 - Create: `engine/src/pipeline/workflows/gap-coordinator.ts`
 - Create: `engine/src/pipeline/workflows/gap-scheduled-sweep.ts`
 
+> **Phase 1.5 Integration:** The Redis sorted set (`gap:pending`) is replaced by NATS JetStream. Signal ingestion publishes `signals.ingested.{entityId}` events. The Gap Coordinator subscribes to these via NATS consumer (using Phase 1.5's `BaseConsumer` framework) instead of polling Redis. This provides per-entity ordering, circuit breaker protection, and DLQ routing automatically.
+
 - [ ] **Step 1: Create Gap Coordinator workflow**
 
 Create `engine/src/pipeline/workflows/gap-coordinator.ts`:
@@ -2922,6 +2926,8 @@ git commit -m "feat(phase-3a): gap coordinator (singleton poller) and 6-hour sch
 - Create: `engine/src/pipeline/workers/gap-compute-worker.ts`
 - Create: `engine/src/pipeline/workers/detector-worker.ts`
 - Modify: `engine/src/pipeline/activities/write.ts`
+
+> **Phase 1.5 Integration:** The Redis sorted set (`gap:pending`) is replaced by NATS JetStream. Signal ingestion publishes `signals.ingested.{entityId}` events. The Gap Coordinator subscribes to these via NATS consumer (using Phase 1.5's `BaseConsumer` framework) instead of polling Redis. This provides per-entity ordering, circuit breaker protection, and DLQ routing automatically.
 
 - [ ] **Step 1: Create gap coordinator worker**
 
@@ -3137,6 +3143,8 @@ git commit -m "feat(phase-3a): API routes for gaps, domains, admin recompute + s
 - Modify: `engine/src/routes/entities.ts`
 - Modify: `engine/src/events/event-types.ts`
 
+> **Phase 1.5 Integration:** SSE events are published to NATS streams (not Redis Pub/Sub). Use `eventBus.publish('GAP_SCORES', 'gaps.recomputed.{entityId}', event)` from Phase 1.5's EventBus. The SSE Gateway delivers these to connected clients. No direct SSEManager usage needed.
+
 - [ ] **Step 1: Replace entity route Phase 3 stubs**
 
 In `engine/src/routes/entities.ts`, replace the 501 stubs for:
@@ -3200,6 +3208,8 @@ git commit -m "feat(phase-3a): entity route score/history integration and SSE ev
 
 **Files:**
 - Modify: `engine/src/db/init/clickhouse.ts`
+
+> **Phase 1.5 Integration:** Use Phase 1.5's `CachedQueryExecutor` with `CACHE_STRATEGIES.gapScoreByEntity` and `CACHE_STRATEGIES.leaderboard` instead of building new cache logic. Cache invalidation is handled by the NATS CacheInvalidatorConsumer automatically when gap scores are published.
 
 - [ ] **Step 1: Update ClickHouse init**
 
