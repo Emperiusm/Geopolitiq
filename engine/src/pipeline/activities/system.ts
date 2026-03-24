@@ -226,6 +226,10 @@ export async function writeSignalActivity(
     // ClickHouse optional
   }
 
-  const writer = new SignalWriter(db, clickhouse);
+  // Lazy-init NATS deps once per worker process (singleton in nats-deps module)
+  const { getNatsDeps } = await import('./nats-deps');
+  const { featureFlags } = await getNatsDeps();
+
+  const writer = new SignalWriter(db, clickhouse, featureFlags);
   return writer.writeSignal(signal, source);
 }

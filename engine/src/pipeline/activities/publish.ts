@@ -29,6 +29,14 @@ export async function publishActivity(
   eventBus?: EventBus,
   featureFlags?: NatsFeatureFlags | null,
 ): Promise<void> {
+  // Lazy-init NATS deps once per worker process when not injected by caller
+  if (!eventBus || featureFlags === undefined) {
+    const { getNatsDeps } = await import('./nats-deps');
+    const deps = await getNatsDeps();
+    eventBus = eventBus ?? deps.eventBus ?? undefined;
+    featureFlags = featureFlags ?? deps.featureFlags;
+  }
+
   // ── NATS path ──────────────────────────────────────────────────────
   if (eventBus && featureFlags && featureFlags.isEnabled('nats.publish.enabled', true)) {
     const polarity = source.polarity ?? 'behavioral';
