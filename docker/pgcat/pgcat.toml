@@ -13,7 +13,7 @@ database = "gambit"
 
 [pools.gambit.users.0]
 username = "gambit"
-password = "gambit_dev"
+password = "gambit"
 pool_size = 20
 min_pool_size = 5
 pool_mode = "transaction"
