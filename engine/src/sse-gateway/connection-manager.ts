@@ -12,15 +12,22 @@ const TIER_LIMITS: Record<string, number> = {
 /**
  * Tracks per-team active SSE connection counts and enforces tier limits.
  * Free tier is rejected outright (canConnect returns false).
+ *
+ * When a Redis client is supplied, connection counts are also mirrored there
+ * so that multiple gateway pods see the aggregate count rather than only
+ * their local slice (C4 fix).  The in-process Map acts as an L1 cache /
+ * fallback when Redis is unavailable.
  */
 export class ConnectionManager {
-  private readonly counts = new Map<string, number>();
+  private readonly localCounts = new Map<string, number>();
+
+  constructor(private readonly redis?: any) {}
 
   /**
    * Returns true if a new connection from this team is allowed.
    * Free tier is always rejected. Pro / Enterprise are capped by TIER_LIMITS.
    */
-  canConnect(teamId: string, tier: string): boolean {
+  async canConnect(teamId: string, tier: string): Promise<boolean> {
     const normalised = tier.toLowerCase();
 
     const limit = TIER_LIMITS[normalised];
@@ -29,38 +36,63 @@ export class ConnectionManager {
       return false;
     }
 
-    const current = this.counts.get(teamId) ?? 0;
+    if (this.redis) {
+      try {
+        const raw = await this.redis.get(`sse:connections:${teamId}`);
+        const count = parseInt(raw ?? '0', 10);
+        return count < limit;
+      } catch {
+        // Redis unavailable — fall through to local count
+      }
+    }
+
+    const current = this.localCounts.get(teamId) ?? 0;
     return current < limit;
   }
 
   /** Increment the connection count for a team. Call after accepting a connection. */
-  onConnect(teamId: string): void {
-    const current = this.counts.get(teamId) ?? 0;
-    this.counts.set(teamId, current + 1);
-  }
+  async onConnect(teamId: string): Promise<void> {
+    this.localCounts.set(teamId, (this.localCounts.get(teamId) ?? 0) + 1);
 
-  /** Decrement the connection count for a team. Call when a connection closes. */
-  onDisconnect(teamId: string): void {
-    const current = this.counts.get(teamId) ?? 0;
-    const next = Math.max(0, current - 1);
-    if (next === 0) {
-      this.counts.delete(teamId);
-    } else {
-      this.counts.set(teamId, next);
+    if (this.redis) {
+      try {
+        await this.redis.incr(`sse:connections:${teamId}`);
+      } catch {
+        // Non-fatal; local count still tracks this pod's connections
+      }
     }
   }
 
-  /** Sum of active connections across all teams. */
+  /** Decrement the connection count for a team. Call when a connection closes. */
+  async onDisconnect(teamId: string): Promise<void> {
+    const current = this.localCounts.get(teamId) ?? 0;
+    const next = Math.max(0, current - 1);
+    if (next === 0) {
+      this.localCounts.delete(teamId);
+    } else {
+      this.localCounts.set(teamId, next);
+    }
+
+    if (this.redis) {
+      try {
+        await this.redis.decr(`sse:connections:${teamId}`);
+      } catch {
+        // Non-fatal
+      }
+    }
+  }
+
+  /** Sum of active connections tracked locally across all teams. */
   getTotalCount(): number {
     let total = 0;
-    for (const count of this.counts.values()) {
+    for (const count of this.localCounts.values()) {
       total += count;
     }
     return total;
   }
 
-  /** Active connection count for a specific team. */
+  /** Active connection count for a specific team (local only). */
   getTeamCount(teamId: string): number {
-    return this.counts.get(teamId) ?? 0;
+    return this.localCounts.get(teamId) ?? 0;
   }
 }
