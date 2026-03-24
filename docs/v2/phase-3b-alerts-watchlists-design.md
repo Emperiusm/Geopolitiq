@@ -8,6 +8,8 @@
 
 > **Depends on:** Phase 3a (Gap Analysis & Detectors) — specifically the `alerts` table, `watchlists` table, `watchlist_entities` junction table, `alertStatusEnum`, SSE event types, `WebhookPublisher`, and `DetectorBatchWorkflow`.
 
+> **Infrastructure:** Phase 1.5 (Scale Infrastructure) — NATS JetStream event bus for alert delivery, dedicated SSE Gateway for client connections, PgCat for read/write pool separation, DegradationRegistry for service health tracking, webhook SSRF validator.
+
 ---
 
 ## Table of Contents
@@ -233,6 +235,11 @@ DetectorBatchWorkflow detects alert
   │     │
   │     ├─ UPDATE alerts SET fan_out_status = 'completed'
   │     └─ Return: { deliveriesCreated, ssePublished, webhooksQueued }
+```
+
+> **Phase 1.5 Update:** Alert SSE delivery uses NATS instead of Redis PUBLISH. Alerts publish to NATS subject `alerts.fired.{severity}`. The Phase 1.5 SSE Gateway subscribes to `alerts.>` and delivers to connected clients filtered by team watchlist. Redis pipeline is still used for counter/cache updates (`alert:unread:{teamId}`, `alert:inbox:{teamId}`), but SSE distribution goes through NATS.
+
+```
   │
   └─ Continue detector batch processing
 ```
@@ -407,6 +414,8 @@ Webhook endpoints register a `payload_version`. When payload format changes:
 ```
 
 No `alert_deliveries` row created. Returns HTTP status code and response time from the endpoint.
+
+> **Phase 1.5 Update:** Webhook URLs are validated against SSRF attacks using Phase 1.5's `validateWebhookUrl()` from `engine/src/security/webhook-validator.ts`. This checks: HTTPS only, no IP addresses, DNS resolution against denied CIDRs (private, link-local, loopback). Validation runs at both configuration time and delivery time (DNS can change).
 
 ---
 
@@ -743,6 +752,15 @@ SSE Edge Service → Redis SUBSCRIBE sse:alerts:* → fan out to connected clien
 
 Architecture already supports this (Redis pub/sub is the bus). Deployment change, not code change. ~100 lines of Bun/Hono code. Not built in Phase 3b — documented for future scaling.
 
+> **Phase 1.5 Update:** The dedicated SSE Gateway service is now implemented (Phase 1.5, Task 7). It runs on port 3002 as a separate Hono app with:
+> - NATS JetStream multiplexed fan-out (one consumer per pod, not per connection)
+> - Per-team connection caps enforced via Redis (Pro: 25, Enterprise: 200)
+> - JWT/API key authentication via `PostgresAuthProvider`
+> - 15-second heartbeat with graceful disconnect cleanup
+> - `Last-Event-ID` support for reconnection
+>
+> Phase 3b alert events publish to NATS → SSE Gateway delivers to clients. No direct Redis Pub/Sub SSE needed.
+
 ---
 
 ## 10. Scheduled Workflows
@@ -768,6 +786,8 @@ Architecture already supports this (Redis pub/sub is the bus). Deployment change
 ---
 
 ## 11. Caching & Hyper-Optimizations
+
+> **Phase 1.5 Update:** Use Phase 1.5's `CachedQueryExecutor` for alert/watchlist caching. Cache invalidation is automatic via NATS CacheInvalidatorConsumer when alert events publish. The 3-tier cache (L1 LRU → L2 Redis → L3 DB) with stale-while-revalidate handles the read path.
 
 ### 11.1 Redis Cache Map
 
@@ -816,6 +836,23 @@ await pipeline.exec();
 
 5,000 teams = 1 Redis round-trip instead of 5,000.
 
+> **Phase 1.5 Update:** Replace Redis PUBLISH for SSE delivery with NATS publishing:
+> ```typescript
+> // Publish alert event to NATS — SSE Gateway handles delivery
+> await eventBus.publish('ALERTS', `alerts.fired.${alert.severity}`, buildEvent(
+>   'alert.fired', 'alert-fanout', { alertId, entityId, severity, teamIds },
+>   { traceId }
+> ));
+>
+> // Redis still used for counter/cache updates (not SSE delivery)
+> const pipeline = redis.pipeline();
+> for (const teamId of teamIds) {
+>   pipeline.incr(`alert:unread:${teamId}`);
+>   pipeline.zadd(`alert:inbox:${teamId}`, timestamp, inboxJson);
+> }
+> await pipeline.exec();
+> ```
+
 ### 11.5 COPY for Bulk Delivery Inserts
 
 Batches > 500 deliveries use PostgreSQL COPY protocol (5-10x faster than batch INSERT). Batches ≤ 500 use batch INSERT with RETURNING.
@@ -831,6 +868,8 @@ Alerts buffered and batch-indexed every 10 seconds or 50 documents via Typesense
 ---
 
 ## 12. Rate Limiting
+
+> **Phase 1.5 Update:** Phase 1.5 provides 4-layer rate limiting (global → per-IP → per-team → per-endpoint) and tier-based priority admission under load. Alert-specific rate limits (per the spec) layer on top of these. Use the existing `engine/src/middleware/rate-limit.ts` and `engine/src/middleware/priority-admission.ts`.
 
 Endpoint-specific limits (in addition to team-level daily quota):
 
