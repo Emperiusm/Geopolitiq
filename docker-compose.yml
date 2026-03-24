@@ -427,10 +427,40 @@ services:
       - observability
       - all
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    profiles:
+      - observability
+      - all
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    profiles:
+      - observability
+      - all
+
   tempo:
     image: grafana/tempo:latest
     ports:
       - "3200:3200"
+    profiles:
+      - observability
+      - all
+
+  pyroscope:
+    image: grafana/pyroscope:latest
+    ports:
+      - "4040:4040"
     profiles:
       - observability
       - all
@@ -476,3 +506,4 @@ volumes:
   caddy_data:
   grafana_data:
   nats_data:
+  loki_data:

@@ -29,6 +29,7 @@ import { requestId } from './middleware/request-id';
 import { requestLogger } from './middleware/request-logger';
 import { apiVersion } from './middleware/api-version';
 import { etag } from './middleware/etag';
+import { registry, httpRequestDuration, httpRequestsTotal } from './infrastructure/metrics';
 
 // ── Bootstrap ────────────────────────────────────────────────────────
 
@@ -128,8 +129,25 @@ async function boot() {
   app.use('*', compress());
   app.use('*', errorHandler(logger));
 
+  // Metrics middleware — records every request
+  app.use('*', async (c, next) => {
+    const start = performance.now();
+    await next();
+    const duration = (performance.now() - start) / 1000;
+    const route = c.req.routePath ?? c.req.path;
+    const status = c.res.status.toString();
+    httpRequestDuration.observe({ method: c.req.method, route, status }, duration);
+    httpRequestsTotal.inc({ method: c.req.method, route, status });
+  });
+
   // Public routes (no auth required)
   app.route(basePath, healthRoutes(container));
+
+  // Prometheus metrics endpoint — public, before authenticate middleware
+  app.get('/metrics', async (c) => {
+    const metrics = await registry.metrics();
+    return c.text(metrics, 200, { 'Content-Type': registry.contentType });
+  });
 
   // Authenticated routes
   app.use(`${basePath}/*`, authenticate(authProvider));
