@@ -114,7 +114,11 @@ export abstract class BaseConsumer {
       if (state === 'open' || state === 'cost-hold') {
         const backoffMs = this.breaker.getBackoffMs();
         this.logger.warn({ state, backoffMs, consumerName }, 'Circuit open — backing off');
-        await sleep(backoffMs);
+        const deadline = Date.now() + backoffMs;
+        while (this.running && Date.now() < deadline) {
+          await sleep(Math.min(1_000, deadline - Date.now()));
+        }
+        if (!this.running) break;
 
         if (this.breaker.shouldProbe()) {
           this.breaker.setState('half-open');
