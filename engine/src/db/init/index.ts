@@ -6,6 +6,7 @@ import { createRlsPolicies } from './rls';
 import { createComments } from './comments';
 import { createMaterializedViews } from './materialized-views';
 import { initPartitions } from './partitions';
+import { initDatabaseRoles } from './roles';
 
 export async function runDatabaseInit(db: DrizzleClient, logger: Logger): Promise<void> {
   await createExtensions(db);
@@ -19,6 +20,9 @@ export async function runDatabaseInit(db: DrizzleClient, logger: Logger): Promis
 
   await createRlsPolicies(db);
   logger.info('RLS policies applied');
+
+  await initDatabaseRoles(db);
+  logger.info('Database roles initialised');
 
   await createComments(db);
   logger.info('Table comments applied');
