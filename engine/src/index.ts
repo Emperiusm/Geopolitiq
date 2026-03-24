@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { compress } from 'hono/compress';
 import { loadConfig, createLogger } from '@gambit/common';
-import { connectPostgres, closePgPool, getReadDb } from './infrastructure/postgres';
+import { connectPostgres, closePgPool, getReadDb, getSlowReadDb } from './infrastructure/postgres';
 import { connectTypesense, configureSynonyms } from './infrastructure/typesense';
 import { connectClickhouse } from './infrastructure/clickhouse';
 import { connectMinio, ensureBuckets } from './infrastructure/minio';
@@ -44,9 +44,10 @@ async function boot() {
   const config = loadConfig();
   logger.info({ port: config.engine.port }, 'Config loaded');
 
-  // 2. Connect PostgreSQL (fatal on failure) — initialises both write + read pools
+  // 2. Connect PostgreSQL (fatal on failure) — initialises write + fast-read + slow-read pools
   const db = await connectPostgres(config, logger);
   const readDb = getReadDb();
+  const slowReadDb = getSlowReadDb();
 
   // 3. Run database init (extensions, triggers, RLS, materialized views)
   await runDatabaseInit(db, logger);
@@ -98,6 +99,7 @@ async function boot() {
   const container = createServiceContainer({
     db,
     readDb,
+    slowReadDb,
     typesense,
     clickhouse,
     minio,

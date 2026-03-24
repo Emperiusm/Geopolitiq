@@ -7,6 +7,7 @@ import type { createCacheStack } from '../infrastructure/cache-layers';
 export interface ServiceContainer {
   db: DrizzleClient;
   readDb: DrizzleClient;
+  slowReadDb: DrizzleClient;
   typesense: TypesenseClient | null;
   clickhouse: ClickhouseClient | null;
   minio: any | null;
@@ -25,6 +26,7 @@ export interface ServiceContainer {
 export function createServiceContainer(deps: {
   db: DrizzleClient;
   readDb: DrizzleClient;
+  slowReadDb: DrizzleClient;
   typesense: TypesenseClient | null;
   clickhouse: ClickhouseClient | null;
   minio: any | null;
