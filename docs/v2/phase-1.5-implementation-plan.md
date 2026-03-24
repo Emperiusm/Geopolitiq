@@ -11,23 +11,23 @@
 **Design spec:** `docs/v2/2026-03-23-scale-infrastructure-design.md`
 **Depends on:** Phase 1 (complete), Phase 2 (complete, merged to main)
 
-**Status:** Not started
+**Status:** ✅ Complete — 11/11 tasks implemented, 55 files, 5,328 lines. Branch: `feature/phase-1.5-scale-infrastructure`
 
 ---
 
 ## Table of Contents
 
-- [ ] [Task 1: NATS JetStream — Docker + EventBus Abstraction](#task-1-nats-jetstream--docker--eventbus-abstraction)
-- [ ] [Task 2: NATS Consumer Framework](#task-2-nats-consumer-framework)
-- [ ] [Task 3: PgCat + Read/Write Pool Separation](#task-3-pgcat--readwrite-pool-separation)
-- [ ] [Task 4: Signal Table Partitioning](#task-4-signal-table-partitioning)
-- [ ] [Task 5: Retrofit Phase 2 Pipelines → NATS](#task-5-retrofit-phase-2-pipelines--nats)
-- [ ] [Task 6: NATS Consumers — ClickHouse, Neo4j, Typesense, Cache](#task-6-nats-consumers--clickhouse-neo4j-typesense-cache)
-- [ ] [Task 7: SSE Gateway Service](#task-7-sse-gateway-service)
-- [ ] [Task 8: Cache Strategy + CDN Integration](#task-8-cache-strategy--cdn-integration)
-- [ ] [Task 9: Observability Stack](#task-9-observability-stack)
-- [ ] [Task 10: Graceful Degradation](#task-10-graceful-degradation)
-- [ ] [Task 11: Security Hardening + Rate Limiting](#task-11-security-hardening--rate-limiting)
+- [x] [Task 1: NATS JetStream — Docker + EventBus Abstraction](#task-1-nats-jetstream--docker--eventbus-abstraction)
+- [x] [Task 2: NATS Consumer Framework](#task-2-nats-consumer-framework)
+- [x] [Task 3: PgCat + Read/Write Pool Separation](#task-3-pgcat--readwrite-pool-separation)
+- [x] [Task 4: Signal Table Partitioning](#task-4-signal-table-partitioning)
+- [x] [Task 5: Retrofit Phase 2 Pipelines → NATS](#task-5-retrofit-phase-2-pipelines--nats)
+- [x] [Task 6: NATS Consumers — ClickHouse, Neo4j, Typesense, Cache](#task-6-nats-consumers--clickhouse-neo4j-typesense-cache)
+- [x] [Task 7: SSE Gateway Service](#task-7-sse-gateway-service)
+- [x] [Task 8: Cache Strategy + CDN Integration](#task-8-cache-strategy--cdn-integration)
+- [x] [Task 9: Observability Stack](#task-9-observability-stack)
+- [x] [Task 10: Graceful Degradation](#task-10-graceful-degradation)
+- [x] [Task 11: Security Hardening + Rate Limiting](#task-11-security-hardening--rate-limiting)
 
 ---
 
@@ -3131,3 +3131,33 @@ After all 11 tasks are complete:
 - [ ] `curl localhost:3001/engine/v1/health/deps` — shows all service statuses
 - [ ] Publish a test event to NATS → verify ClickHouse, Typesense consumers process it
 - [ ] Open SSE connection to gateway → verify events fan out
+
+---
+
+## Post-Implementation Fixes
+
+After the initial 11 tasks, a comprehensive gap analysis identified 5 critical and 4 important issues. All were fixed:
+
+### Critical Fixes
+- **C1:** `nats-deps.ts` — Fixed private constructor call on `NatsFeatureFlags` (use `.create()` factory)
+- **C2:** PgCat — Three-tier pool separation (`gambit_write` 20, `gambit_fast_read` 30, `gambit_slow_read` 15)
+- **C3:** SSE Gateway — Added real auth via `PostgresAuthProvider` (was trusting client headers)
+- **C4:** ConnectionManager — Redis-backed per-team connection counts for multi-pod enforcement
+- **C5:** Wired `priorityAdmission` middleware + `batchRoutes` into `index.ts` router
+
+### Important Fixes
+- **I5:** Added composite B-tree index `idx_signals_entity_polarity(entity_id, polarity, published_at DESC)`
+- **I8:** AuditLog — Added database persistence via `record()` + `flush()` methods
+- **I9:** Cache invalidation — Expanded to 3 consumer instances (signals, entities, gaps streams)
+- **I10:** BaseConsumer — Set `max_deliver` on NATS durable consumer config
+
+### Pipeline Wiring
+- Created `engine/src/pipeline/activities/nats-deps.ts` — lazy singleton for NATS deps in Temporal workers
+- Updated `system.ts` and `publish.ts` to auto-initialize NATS when called from Temporal (feature-flag controlled)
+
+### Deferred to Phase 3+
+- I1: Degradation overrides via NATS KV propagation (local Map sufficient for single-pod dev)
+- I2: Zod schema validation on NATS events (TypeScript types provide compile-time safety)
+- I3: alert-evaluator + webhook-dispatcher consumers (Phase 3b scope)
+- I4: `getReadDbConsistent()` sticky-primary window (matters after replicas deployed)
+- S1-S8: Security headers, PER, event coalescing, ES256 JWT, Argon2id (Phase 3b/4)
